@@ -1,0 +1,26 @@
+{
+    "manifest_version": 3,
+    "name": "TheFirstTry",
+    "version": "1.0",
+  
+    "description": "Adds a Hello World box to specific webpages.",
+  
+    "icons": {
+        "48": "icons/border-48.png"
+    },
+
+    "permissions": [
+        "scripting"
+    ],
+
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["borderify.js"]
+        }
+    ],
+
+    "host_permissions": [
+        "*://*/*"
+    ]
+}
