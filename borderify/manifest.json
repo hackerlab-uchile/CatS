@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "TheFirstTry",
-    "version": "1.0",
+    "version": "1.1",
   
     "description": "Adds a Hello World box to specific webpages.",
   
@@ -10,17 +10,43 @@
     },
 
     "permissions": [
-        "scripting"
+        "scripting",
+        "declarativeNetRequest",
+        "notifications"
     ],
 
     "content_scripts": [
         {
             "matches": ["<all_urls>"],
-            "js": ["borderify.js"]
+            "js": ["content.js"]
         }
     ],
 
+
+    "background": {
+        "service_worker": "background.js"
+    },
+
+      
+
     "host_permissions": [
         "*://*/*"
+    ],
+
+    "declarative_net_request": {
+        "rule_resources": [
+            {
+                "id": "ruleset_1",
+                "enabled": true,
+                "path": "rules.json"
+            }
+        ]
+    },
+
+    "web_accessible_resources": [
+        {
+        "resources": ["sensitive_urls.json"],
+        "matches": ["<all_urls>"]
+        }
     ]
 }
