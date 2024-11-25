@@ -2,22 +2,31 @@ version: '3.9'
 services:
   db:
     image: postgres
-    restart: never
+    container_name: postgres_db
+    restart: no
     ports:
-      - 5432:5432
+      - "5433:5432"
     environment:
-      - PGUSER
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
-      - POSTGRES_SERVER
+      POSTGRES_USER: CatS_user
+      POSTGRES_PASSWORD: CatS_test
+      POSTGRES_DB: CatS
     volumes:
       - db-data:/var/lib/postgresql/data
-  frontend:
-    build: ./frontend
-    ports:
-      - 3000:3000
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: CatS_app
+    command: uvicorn main:app --host 0.0.0.0 --reload
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
+    volumes:
+      - ./backend/app:/app
+    
 
 volumes:
   db-data:
