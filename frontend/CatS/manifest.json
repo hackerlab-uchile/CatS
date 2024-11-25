@@ -1,17 +1,17 @@
 {
     "manifest_version": 3,
-    "name": "TheFirstTry",
+    "name": "ExtensionCatS",
     "version": "1.1",
   
-    "description": "Adds a Hello World box to specific webpages.",
+    "description": "",
   
     "icons": {
         "48": "icons/border-48.png"
     },
 
     "permissions": [
-        "scripting",
         "declarativeNetRequest",
+        "scripting",
         "notifications"
     ],
 
