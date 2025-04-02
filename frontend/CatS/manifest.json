@@ -45,7 +45,7 @@
 
     "web_accessible_resources": [
         {
-        "resources": ["sensitive_urls.json"],
+        "resources": ["sensitive_urls.json", "blocked_urls.json"],
         "matches": ["<all_urls>"]
         }
     ]

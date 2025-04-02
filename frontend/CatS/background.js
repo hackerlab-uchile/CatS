@@ -6,7 +6,7 @@ const urlsToBlock = [
 ];
 */
 
-fetch(chrome.runtime.getURL("blocked_urls.json"))
+fetch(chrome.runtime.getURL("blocked_urls.json"))  //Read the json with the urls to block
   .then(response => response.json())
   .then(urlsToBlock => {
     const dynamicRules = urlsToBlock.map((url, index) => ({
@@ -19,19 +19,18 @@ fetch(chrome.runtime.getURL("blocked_urls.json"))
       }
     }));
 
-    chrome.runtime.onInstalled.addListener(() => {
-      chrome.declarativeNetRequest.updateDynamicRules(
-        {
-          addRules: dynamicRules,
-          removeRuleIds: dynamicRules.map(rule => rule.id)
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.error("Error al actualizar reglas:", chrome.runtime.lastError);
-          } else {
-            console.log("Reglas dinámicas agregadas exitosamente.");
-          }
+    //Dynamic addition of rules
+    chrome.declarativeNetRequest.updateDynamicRules(
+      {
+        addRules: dynamicRules,
+        removeRuleIds: dynamicRules.map(rule => rule.id)
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          console.error("Error al actualizar reglas:", chrome.runtime.lastError);
+        } else {
+          console.log("Reglas dinámicas agregadas exitosamente.");
         }
-      );
-    });
+      }
+    );
   });

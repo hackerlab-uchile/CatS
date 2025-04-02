@@ -1,3 +1,3 @@
 # Memoria
 
-Here will be the implementation of my memory work
+To execute backend run _docker compose up_
