@@ -1,18 +1,18 @@
-//
-//chrome.runtime.sendMessage({ type: "notify", message: "Página de contenido sensible detectada." });
-// Cargar la lista de URLs sensibles
-fetch(chrome.runtime.getURL("sensitive_urls.json"))
-    .then(response => response.json())
-    .then(sensitiveUrls => {
+chrome.runtime.sendMessage({ type: "getFilteredURLs" }, response => {
+    if (response && response.urls) {
         const currentHostname = window.location.hostname;
-        const sensitiveDomains = sensitiveUrls.map(url => {
-          // Extrae el dominio base, por ejemplo: "ilovepdf.com"
-          const parser = document.createElement('a');
-          parser.href = url;
-          return parser.hostname;
+        response.urls.forEach(({ url, action }) => {
+            let storedHostname = new URL(url).hostname;
+            if (currentHostname.endsWith(storedHostname)) {
+                if (action === "alertar") {
+                    alert("Página de contenido sensible. Proceda con precaución.");
+                } else if (action === "notificar") {
+                    chrome.runtime.sendMessage({ type: "notify", message: `Advertencia: Estás visitando ${currentHostname}` });
+                } else if (action === "bloquear") {
+                    window.location.href = "about:blank";
+                }
+            }
         });
-        
-        if (sensitiveDomains.some(domain => currentHostname.endsWith(domain))) {
-          alert("Página de contenido sensible. Proceda con precaución.");
-        }
-    });
+    }
+});
+

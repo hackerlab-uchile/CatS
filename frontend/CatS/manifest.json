@@ -12,7 +12,8 @@
     "permissions": [
         "declarativeNetRequest",
         "scripting",
-        "notifications"
+        "notifications",
+        "storage"
     ],
 
     "content_scripts": [
