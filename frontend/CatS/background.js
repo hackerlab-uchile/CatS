@@ -73,6 +73,62 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch(error => sendResponse({ error }));
         return true; // Indica respuesta asincrónica
     }
+    if (message.type === "block") {
+        const urlToBlock = message.url;
+
+        chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [{
+                id: Math.floor(Math.random() * 100000), // Un ID único ----- ARREGLAR
+                priority: 1,
+                action: { type: "block" },
+                condition: {
+                    urlFilter: urlToBlock,
+                    resourceTypes: ["main_frame"]
+                }
+            }],
+        }, () => {
+            sendResponse({ status: "blocked" });
+            
+        });
+
+        // Importante: mantener esto para respuestas asíncronas
+        return true;
+    }
+    if (message.type === "notify") {
+        chrome.notifications.create({
+            type: "basic",
+            iconUrl: "icons/border-48.png", // debe ser un ícono de tu extensión, o usa uno pequeño (48x48 px)
+            title: "Advertencia",
+            message: message.message
+        });
+    }
+    if (message.type === "blockAndNotify") {
+        const urlToBlock = message.url;
+        const host = message.host;
+    
+        chrome.notifications.create({
+            type: "basic",
+            iconUrl: "icons/border-48.png",
+            title: "Advertencia",
+            message: `Se ha bloqueado el acceso a ${host}`
+        }, () => {
+            chrome.declarativeNetRequest.updateDynamicRules({
+                addRules: [{
+                    id: Math.floor(Math.random() * 100000),
+                    priority: 1,
+                    action: { type: "block" },
+                    condition: {
+                        urlFilter: urlToBlock,
+                        resourceTypes: ["main_frame"]
+                    }
+                }],
+            });
+        });
+    
+        return true;
+    }    
 });
+
+
 
 self.addURL = addURL;

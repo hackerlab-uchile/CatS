@@ -13,7 +13,8 @@
         "declarativeNetRequest",
         "scripting",
         "notifications",
-        "storage"
+        "storage",
+        "declarativeNetRequestWithHostAccess"
     ],
 
     "content_scripts": [
@@ -46,7 +47,7 @@
 
     "web_accessible_resources": [
         {
-        "resources": ["sensitive_urls.json", "blocked_urls.json"],
+        "resources": ["/icons/border-48.png"],
         "matches": ["<all_urls>"]
         }
     ]
