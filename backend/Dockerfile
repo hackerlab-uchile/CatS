@@ -1,12 +1,20 @@
 ARG PYTHON_VERSION=3.11.9
 FROM python:${PYTHON_VERSION}-slim
 
+# Prevents Python from writing pyc files.
+ENV PYTHONDONTWRITEBYTECODE=1
+
 # Working directory
 WORKDIR /app
 
 # Copy requirements and install dependences
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Download dependencies as a separate step to take advantage of Docker's caching.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    python -m pip install --no-cache-dir --upgrade -r requirements.txt
 
 # Copy application code to the container
 COPY ./app /app/

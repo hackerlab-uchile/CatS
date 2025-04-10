@@ -19,7 +19,7 @@ class Community(Base):
     ip = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     total_followers = Column(Integer, default=0)
-    created_date = Column(DateTime, default=datetime.utcnow)
+    created_date = Column(DateTime, default=datetime.astimezone)
 
     # a community can have multiple tags
     tags = relationship("Tag", back_populates="community")
