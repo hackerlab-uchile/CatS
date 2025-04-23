@@ -25,7 +25,19 @@ services:
       - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
     volumes:
       - ./backend/app:/app
-    
+  telegram_bot:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: CatS_bot
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
+      - BOTTOKEN=tu_token_aqui
+    volumes:
+      - ./backend/app:/app
+    command: python bot.py
 
 volumes:
   db-data:
