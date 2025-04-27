@@ -1,16 +1,17 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from sqlalchemy import BigInteger
 
 class UrlBase(BaseModel):
     url: str
     justification: Optional[str]
 
 class UrlCreate(UrlBase):
-    community_id: int
+    community_id: BigInteger
 
 class Url(UrlBase):
     id: int
-    community_id: int
+    community_id: BigInteger
 
     class Config:
         orm_mode = True
@@ -20,11 +21,11 @@ class TagBase(BaseModel):
     action: Optional[str]
 
 class TagCreate(TagBase):
-    community_id: int
+    community_id: BigInteger
 
 class Tag(TagBase):
     id: int
-    community_id: int
+    community_id: BigInteger
 
     class Config:
         orm_mode = True
@@ -39,7 +40,7 @@ class CommunityCreate(CommunityBase):
     pass
 
 class Community(CommunityBase):
-    id: int
+    id: BigInteger
     created_date: str
     tags: List[Tag] = []
     urls: List[Url] = []

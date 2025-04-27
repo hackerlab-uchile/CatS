@@ -1,10 +1,10 @@
-from database import get_db
+from app.database import get_db
 from fastapi import Depends
 from typing import List
 from main import app
-from models import Community
+from app.models import Community
 from sqlalchemy.orm import Session
-import schemas
+from app import schemas
 
 # path
 @app.get("/communities/", response_model=List[schemas.Community])

@@ -1,5 +1,5 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Table
-from database import Base
+from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Table, BigInteger
+from app.database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -12,14 +12,14 @@ tag_url = Table(
 )
 
 class Community(Base):
-    __tablename__ = "community"
+    __tablename__ = "community"  # Name of the table
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=False)
     name = Column(String, nullable=False)
     ip = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     total_followers = Column(Integer, default=0)
-    created_date = Column(DateTime, default=datetime.astimezone)
+    created_date = Column(DateTime, default=datetime.utcnow)
 
     # a community can have multiple tags
     tags = relationship("Tag", back_populates="community")
@@ -29,7 +29,7 @@ class Tag(Base):
     __tablename__ = "tag"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    community_id = Column(Integer, ForeignKey("community.id", ondelete="CASCADE"))
+    community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
     name = Column(String, nullable=False)
     action = Column(String, nullable=False)
 
@@ -42,7 +42,7 @@ class Url(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     url = Column(String, nullable=False, unique=True)
     justification = Column(Text, nullable=False)
-    community_id = Column(Integer, ForeignKey("community.id", ondelete="CASCADE"))
+    community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
 
     community = relationship("Community", back_populates="urls")
     tags = relationship("Tag", secondary=tag_url, back_populates="urls")

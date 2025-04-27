@@ -1,10 +1,11 @@
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-URL_DATABASE = 'postgresql://CatS_user:CatS_test@db:5432/CatS'
+URL_DATABASE = os.getenv("DATABASE_URL")
 
-engine = create_engine(URL_DATABASE)
+# Connection engine (connects python to the database)
+engine = create_engine(URL_DATABASE, echo=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -15,4 +16,5 @@ def get_db():
     finally:
         db.close()
 
+# Create a Base class for the models
 Base = declarative_base()

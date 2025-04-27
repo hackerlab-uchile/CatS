@@ -2,7 +2,7 @@ services:
   db:
     image: postgres
     container_name: postgres_db
-    restart: no
+    restart: 'no'
     ports:
       - "5433:5432"
     environment:
@@ -16,28 +16,32 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: CatS_app
-    command: uvicorn main:app --host 0.0.0.0 --reload
-    depends_on:
+    command: bash -c "python app/init_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on: 
       - db
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
+      - PYTHONPATH=/app
     volumes:
-      - ./backend/app:/app
+      - ./backend:/app
   telegram_bot:
     build: 
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: app/bot/Dockerfile
     container_name: CatS_bot
     depends_on:
       - db
+      - backend
     environment:
       - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
-      - BOTTOKEN=tu_token_aqui
+      - BOTTOKEN=8099655131:AAHzUC8nbDuu822_aetwsYDUV81B3dfaaLc
+      - PYTHONPATH=/app
+      - SERVER_IP=127.0.0.1
     volumes:
-      - ./backend/app:/app
-    command: python bot.py
+      - ./backend:/app
+    command: python -u -m app.bot.bot_conn
 
 volumes:
   db-data:

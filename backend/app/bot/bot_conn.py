@@ -9,21 +9,19 @@ from app.models import Community, Tag, Url
 # Bot setup
 TOKEN = os.getenv("BOTTOKEN")
 bot = telebot.TeleBot(TOKEN)
-
+print(TOKEN)
 # Default server IP (for all communities)
-SERVER_IP = os.getenv("SERVER_IP", "127.0.0.1")
-
+IPSERVER = os.getenv("SERVER_IP")
+print(IPSERVER)
 # Dictionary to save the state per chat
 user_states = {}
-
 # Fuction to show the action menu (create tag or add url)
-def show_action_menu(chat_id, has_tags: bool):
+def show_action_menu(chat_id, community):
     """
     Send appropriate menu: if no tags, ask to create one, else, ask create tag or add URL
     """
-    has_tags = db.query(Tag).filter_by(community_id=community.id).count() > 0
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    if not has_tags:
+    if not community.tags:  # Asumiendo que `community` tiene un atributo `tags`
         markup.add(types.KeyboardButton("Crear tag"))
         bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
     else:
@@ -31,13 +29,19 @@ def show_action_menu(chat_id, has_tags: bool):
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
     user_states[chat_id] = {'step': 'choose_action'}
 
+"""
+@bot.message_handler(func=lambda message: bot.get_me().username in message.text)
+def handle_mention(message):
+    bot.reply_to(message, "Hola, escribe /start para configurar tu comunidad 😊")
+"""
+
 
 # /start handler
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     chat = message.chat
     chat_id = chat.id
-
+    print(chat_id)
     # Only operate in group chats
     if chat.type not in ['group', 'supergroup']:
         bot.send_message(chat_id, "Este bot solo funciona en chats grupales.")
@@ -45,15 +49,16 @@ def handle_start(message):
 
     # Initialize or retrieve community
     db = next(get_db())
-    community = db.query(Community).filter_by(id=chat_id).first()
-
+    #community = db.query(Community).filter_by(id=chat_id).first()
+    community = None
     if community is None:
         # Preguntar nombre de comunidad
         user_states[chat_id] = {'step': 'ask_name'}
+        print(user_states)
         bot.send_message(chat_id, "¡Hola! Primero, ingresa el nombre de la comunidad a registrar:")
     else:
         # Mostrar menú de acciones
-        show_action_menu(chat_id, db, community)
+        show_action_menu(chat_id, community)
 
 
 # Name reseption
@@ -62,6 +67,7 @@ def handle_name(message):
     chat_id = message.chat.id
     name = message.text.strip()
     user_states[chat_id] = {'step': 'ask_description', 'name': name}
+    print(f"Estado actualizado a 'ask_description' para {chat_id}. Nombre: {name}") 
     bot.send_message(chat_id, "Ahora ingresa una descripción para la comunidad:")
 
 
@@ -76,10 +82,10 @@ def handle_description(message):
         community = Community(
             id=chat_id,
             name=name,
-            ip=SERVER_IP,
+            ip=IPSERVER, # eliminar -------------------------------------
             description=description,
-            total_seguidores=0,
-            created_at=datetime.utcnow()
+            total_followers =0,  # reformular --------------- investigar tools para estadisticas fuera de la db
+            created_date=datetime.utcnow()
         )
         db.add(community)
         db.commit()
@@ -91,7 +97,7 @@ def handle_description(message):
         user_states.pop(chat_id, None)
         db = next(get_db())
         community = db.query(Community).filter_by(id=chat_id).first()
-        show_action_menu(chat_id, db, community)
+        show_action_menu(chat_id, community)
 
 
 # Action choise
@@ -139,7 +145,7 @@ def handle_fill_tag_action(message):
         bot.send_message(chat_id, f"Error al guardar el tag: {e}")
     finally:
         user_states.pop(chat_id, None)
-        show_action_menu(chat_id, next(get_db()), community)
+        show_action_menu(chat_id, community)
 
 
 # -- FILL URL --
@@ -167,9 +173,10 @@ def handle_fill_url_justification(message):
         bot.send_message(chat_id, f"Error guardando URL: {e}")
     finally:
         user_states.pop(chat_id, None)
-        show_action_menu(chat_id, next(get_db()), community)
+        show_action_menu(chat_id, community)
 
-
+print(user_states)
 # Inicia polling
 if __name__ == '__main__':
     bot.polling(none_stop=True)
+    print(user_states)
