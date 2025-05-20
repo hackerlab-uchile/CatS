@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from sqlalchemy import BigInteger
+from sqlalchemy import BigInteger, DateTime
 
 class UrlBase(BaseModel):
     url: str
@@ -32,16 +32,14 @@ class Tag(TagBase):
 
 class CommunityBase(BaseModel):
     name: str
-    ip: str
     description: Optional[str]
-    total_followers: Optional[int]
 
 class CommunityCreate(CommunityBase):
     pass
 
 class Community(CommunityBase):
     id: BigInteger
-    created_date: str
+    created_date: DateTime
     tags: List[Tag] = []
     urls: List[Url] = []
 

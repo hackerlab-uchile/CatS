@@ -8,7 +8,7 @@ tag_url = Table(
     "tag_url",
     Base.metadata,
     Column("tag_id", Integer, ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True),
-    Column("url_id", Integer, ForeignKey("url.id", ondelete="CASCADE"), primary_key=True),
+    Column("url_id", Integer, ForeignKey("url.id", ondelete="CASCADE"), primary_key=True),extend_existing=True
 )
 
 class Community(Base):
@@ -16,9 +16,7 @@ class Community(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=False)
     name = Column(String, nullable=False)
-    ip = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    total_followers = Column(Integer, default=0)
     created_date = Column(DateTime, default=datetime.utcnow)
 
     # a community can have multiple tags

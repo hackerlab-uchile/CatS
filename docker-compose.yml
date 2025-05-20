@@ -21,8 +21,9 @@ services:
       - db
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app
@@ -31,14 +32,10 @@ services:
       context: ./backend
       dockerfile: app/bot/Dockerfile
     container_name: CatS_bot
+    env_file: .env
     depends_on:
       - db
       - backend
-    environment:
-      - DATABASE_URL=postgresql+psycopg2://CatS_user:CatS_test@db:5432/CatS
-      - BOTTOKEN=8099655131:AAHzUC8nbDuu822_aetwsYDUV81B3dfaaLc
-      - PYTHONPATH=/app
-      - SERVER_IP=127.0.0.1
     volumes:
       - ./backend:/app
     command: python -u -m app.bot.bot_conn

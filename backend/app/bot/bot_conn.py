@@ -21,19 +21,18 @@ def show_action_menu(chat_id, community):
     Send appropriate menu: if no tags, ask to create one, else, ask create tag or add URL
     """
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    if not community.tags:  # Asumiendo que `community` tiene un atributo `tags`
-        markup.add(types.KeyboardButton("Crear tag"))
-        bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
-    else:
-        markup.add(types.KeyboardButton("Crear tag"), types.KeyboardButton("Agregar URL"))
-        bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
+    #if not community.tags:  # Asumiendo que `community` tiene un atributo `tags`
+     #   markup.add(types.KeyboardButton("Crear tag"))
+      #  bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
+    #else:
+    markup.add(types.KeyboardButton("Crear tag"), types.KeyboardButton("Agregar URL"))
+    bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
     user_states[chat_id] = {'step': 'choose_action'}
 
-"""
+
 @bot.message_handler(func=lambda message: bot.get_me().username in message.text)
 def handle_mention(message):
     bot.reply_to(message, "Hola, escribe /start para configurar tu comunidad 😊")
-"""
 
 
 # /start handler
@@ -82,9 +81,7 @@ def handle_description(message):
         community = Community(
             id=chat_id,
             name=name,
-            ip=IPSERVER, # eliminar -------------------------------------
             description=description,
-            total_followers =0,  # reformular --------------- investigar tools para estadisticas fuera de la db
             created_date=datetime.utcnow()
         )
         db.add(community)
