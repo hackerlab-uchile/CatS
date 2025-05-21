@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1
 # Working directory
 WORKDIR /app
 
-# Copy application code to the container #COPY ./app /app/
+# Copy application code to the container
 COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
