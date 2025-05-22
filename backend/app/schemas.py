@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from sqlalchemy import BigInteger, DateTime
+from sqlalchemy import BigInteger, DateTime, Integer
 
 class UrlBase(BaseModel):
     url: str
@@ -8,10 +8,12 @@ class UrlBase(BaseModel):
 
 class UrlCreate(UrlBase):
     community_id: BigInteger
+    tag_id: Integer
 
 class Url(UrlBase):
     id: int
     community_id: BigInteger
+    tag_id: Integer
 
     class Config:
         orm_mode = True
@@ -19,6 +21,7 @@ class Url(UrlBase):
 class TagBase(BaseModel):
     name: str
     action: Optional[str]
+    description: Optional[str]
 
 class TagCreate(TagBase):
     community_id: BigInteger

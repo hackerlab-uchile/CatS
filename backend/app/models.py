@@ -27,9 +27,10 @@ class Tag(Base):
     __tablename__ = "tag"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
     name = Column(String, nullable=False)
     action = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
 
     community = relationship("Community", back_populates="tags")
     urls = relationship("Url", secondary=tag_url, back_populates="tags")
@@ -41,6 +42,7 @@ class Url(Base):
     url = Column(String, nullable=False, unique=True)
     justification = Column(Text, nullable=False)
     community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
+    tag_id = Column(Integer, ForeignKey("tag.id", ondelete="CASCADE"))
 
     community = relationship("Community", back_populates="urls")
     tags = relationship("Tag", secondary=tag_url, back_populates="urls")

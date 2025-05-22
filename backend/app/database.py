@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 URL_DATABASE = os.getenv("DATABASE_URL")
+print(URL_DATABASE)
 
 # Connection engine (connects python to the database)
 engine = create_engine(URL_DATABASE, echo=True)
@@ -15,6 +16,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 # Create a Base class for the models
 Base = declarative_base()
