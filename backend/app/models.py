@@ -2,6 +2,9 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Tabl
 from app.database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+chile_time = datetime.now(ZoneInfo("America/Santiago"))
 
 # Relation many-to-many between url and tag
 tag_url = Table(
@@ -17,7 +20,7 @@ class Community(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=False)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    created_date = Column(DateTime, default=datetime.utcnow)
+    created_date = Column(DateTime, default=chile_time)
 
     # a community can have multiple tags
     tags = relationship("Tag", back_populates="community")
