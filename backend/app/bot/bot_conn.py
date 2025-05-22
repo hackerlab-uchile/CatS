@@ -1,6 +1,5 @@
 import telebot
 import os
-from telebot import types
 from datetime import datetime
 from app.database import get_db
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,14 +23,28 @@ def show_action_menu(chat_id, db):
     """
     markup = InlineKeyboardMarkup()
     tag = db.query(Tag).filter_by(community_id=chat_id).first() 
-
+    url = db.query(Url).filter_by(community_id=chat_id).first() 
     if tag is None:
-        markup.add(InlineKeyboardButton("Crear tag", callback_data=f"action_create_tag"))
+        markup.add(
+            InlineKeyboardButton("Crear tag", callback_data=f"action_create_tag"),
+            InlineKeyboardButton("No, Eliminar Comunidad", callback_data="confirm_delete_community")
+            )
         bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
+    elif url is None:
+        markup.add(
+            InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
+            InlineKeyboardButton("Eliminar Tag", callback_data="confirm_delete_tag"),
+            InlineKeyboardButton("Agregar URL", callback_data="action_add_url"),
+            InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
+        )        
+        bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
     else:
         markup.add(
             InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
-            InlineKeyboardButton("Agregar URL", callback_data="action_add_url")
+            InlineKeyboardButton("Eliminar Tag", callback_data="confirm_delete_tag"),
+            InlineKeyboardButton("Agregar URL", callback_data="action_add_url"),
+            InlineKeyboardButton("Ver/Editar URLs", callback_data="manage_urls"),
+            InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
         )        
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
     user_states[chat_id] = {'step': 'choose_action'}
@@ -122,8 +135,16 @@ def handle_action_menu(call):
 def handle_fill_tag_name(message):
     chat_id = message.chat.id
     tag_name = message.text.strip()
-    user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
-    bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
+
+    # check if exits a tag with that name in this community
+    db = next(get_db())
+    existing_tag = db.query(Tag).filter_by(name=tag_name, community_id=chat_id).first()
+    if existing_tag:
+        bot.send_message(chat_id, f"⚠️ Ya existe un tag llamado '{tag_name}' en esta comunidad. Por favor ingresa otro nombre para el tag:")
+        show_action_menu(chat_id, db)
+    else:
+        user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
+        bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
 
 # -> get tag description and ask action of the tag
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_tag_description')
@@ -252,6 +273,192 @@ def handle_fill_url_justification(message):
     finally:
         user_states.pop(chat_id, None)
         show_action_menu(chat_id, db)
+
+
+# -- EDIT URL --
+@bot.callback_query_handler(func=lambda call: call.data == "manage_urls")
+def handle_manage_urls(call):
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    urls = db.query(Url).filter_by(community_id=chat_id).limit(10).all()
+
+    for url in urls:
+        text = f"🌐 URL: {url.url}\n Justificación: {url.justification}\n Tag ID: {url.tag_id}"
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("✏️ Editar", callback_data=f"edit_url_{url.id}"),
+            InlineKeyboardButton("🗑️ Eliminar", callback_data=f"delete_url_{url.id}")
+        )
+        bot.send_message(chat_id, text, reply_markup=markup)
+
+    bot.answer_callback_query(call.id)
+
+# Action buttons for edit url
+@bot.callback_query_handler(func=lambda call: call.data.startswith("edit_url_"))
+def show_url_edit_actions(call):
+    url_id = int(call.data.split("_")[-1])
+    chat_id = call.message.chat.id
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("✏️ Editar justificación", callback_data=f"edit_just_{url_id}"),
+        InlineKeyboardButton("🔁 Cambiar tag", callback_data=f"edit_tag_{url_id}")
+    )
+    bot.send_message(chat_id, f"¿Qué deseas hacer con la URL ID {url_id}?", reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+# Edit Justification url
+@bot.callback_query_handler(func=lambda call: call.data.startswith("edit_just_"))
+def edit_url_justification(call):
+    url_id = int(call.data.split("_")[-1])
+    chat_id = call.message.chat.id
+    user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
+    bot.send_message(chat_id, "Escribe la nueva justificación:")
+
+
+@bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'editing_just')
+def save_new_justification(message):
+    chat_id = message.chat.id
+    new_just = message.text.strip()
+    url_id = user_states[chat_id]['url_id']
+    try:
+        db = next(get_db())
+        url_entry = db.query(Url).filter_by(id=url_id).first()
+        url_entry.justification = new_just
+        db.commit()
+        bot.send_message(chat_id, "Justificación actualizada correctamente.")
+    except SQLAlchemyError as e:
+        bot.send_message(chat_id, f"Error al actualizar: {e}")
+    finally:
+        user_states.pop(chat_id, None)
+        show_action_menu(chat_id, db)
+
+# change url's tag
+@bot.callback_query_handler(func=lambda call: call.data.startswith("edit_tag_"))
+def handle_change_tag_request(call):
+    chat_id = call.message.chat.id
+    url_id = int(call.data.split("_")[-1])
+    db = next(get_db())
+    tags = db.query(Tag).filter_by(community_id=chat_id).all()
+    markup = InlineKeyboardMarkup()
+    for tag in tags:
+        markup.add(InlineKeyboardButton(tag.name, callback_data=f"set_new_tag_{url_id}_{tag.id}"))
+    bot.edit_message_text("Selecciona el nuevo tag para la URL:", chat_id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("set_new_tag_"))
+def set_new_tag(call):
+    parts = call.data.split("_")
+    url_id = int(parts[3])
+    new_tag_id = int(parts[4])
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
+    if url:
+        url.tag_id = new_tag_id
+        db.commit()
+        bot.edit_message_text(f"✅ Tag actualizado para la URL ID {url_id}.", chat_id, call.message.message_id)
+    else:
+        bot.send_message(chat_id, "❌ No se encontró la URL.")
+    bot.answer_callback_query(call.id)
+    show_action_menu(chat_id, db)
+
+# Drop url
+@bot.callback_query_handler(func=lambda call: call.data.startswith("delete_url_"))
+def confirm_delete_url(call):
+    url_id = int(call.data.split("_")[-1])
+    chat_id = call.message.chat.id
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("✅ Sí, eliminar", callback_data=f"confirm_delete_url_{url_id}"),
+        InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete")
+    )
+    bot.edit_message_text("¿Estás segure que deseas eliminar esta URL?", chat_id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_delete_url_"))
+def delete_url(call):
+    url_id = int(call.data.split("_")[-1])
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
+    if url:
+        db.delete(url)
+        db.commit()
+        bot.edit_message_text(f"🗑️ URL ID {url_id} eliminada con éxito.", chat_id, call.message.message_id)
+    else:
+        bot.send_message(chat_id, "No se encontró la URL.")
+    bot.answer_callback_query(call.id)
+
+
+# -- DROP TAG OR COMMUNITY --
+
+#adk confirmation delete tag
+@bot.callback_query_handler(func=lambda call: call.data == "confirm_delete_tag")
+def show_tags_to_delete(call):
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    tags = db.query(Tag).filter_by(community_id=chat_id).all()
+
+    if not tags:
+        bot.edit_message_text("❌ No hay tags para eliminar.", chat_id, call.message.message_id)
+        return
+
+    markup = InlineKeyboardMarkup()
+    for tag in tags:
+        markup.add(InlineKeyboardButton(f"{tag.name}", callback_data=f"delete_tag_{tag.id}"))
+    bot.edit_message_text("Selecciona un tag para eliminar:", chat_id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+#delete tag
+@bot.callback_query_handler(func=lambda call: call.data.startswith("delete_tag_"))
+def delete_tag(call):
+    tag_id = int(call.data.split("_")[-1])
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    tag = db.query(Tag).filter_by(id=tag_id, community_id=chat_id).first()
+    if tag:
+        db.delete(tag)
+        db.commit()
+        bot.edit_message_text(f"✅ Tag '{tag.name}' eliminado.", chat_id, call.message.message_id)
+        show_action_menu(chat_id, db)
+    else:
+        bot.answer_callback_query(call.id, "Tag no encontrado.", show_alert=True)
+
+# ask confirmation delete community 
+@bot.callback_query_handler(func=lambda call: call.data == "confirm_delete_community_")
+def ask_confirm_community_delete(call):
+    chat_id = call.message.chat.id
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("⚠️ Sí, eliminar comunidad", callback_data="delete_community"),
+        InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete_community")
+    )
+    bot.edit_message_text("⚠️ ¿Estás segurx de que deseas eliminar toda la comunidad? Esto eliminará todos los tags y URLs asociados.", chat_id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "delete_community_")
+def ask_confirm_delete_community(call):
+    chat_id = call.message.chat.id
+    db = next(get_db())
+    community = db.query(Community).filter_by(id=chat_id).first()
+    if community:
+        # confirmas si es bnecesario borras las url y tags !!!!!!!!!!!!!!!!!!!!!!!!!!!
+        db.query(Url).filter_by(community_id=chat_id).delete()
+        db.query(Tag).filter_by(community_id=chat_id).delete()
+        db.delete(community)
+        db.commit()
+        bot.edit_message_text("Comunidad eliminada exitosamente.", chat_id, call.message.message_id)
+        show_action_menu(chat_id, db)
+    else:
+        bot.answer_callback_query(call.id, "No se encontró la comunidad.", show_alert=True)
+
+
+# in case of cancel button
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_delete")
+def cancel_deletion(call):
+    bot.answer_callback_query(call.id, text="Operación cancelada.")
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
 
 print(user_states)
 # Inicia polling
