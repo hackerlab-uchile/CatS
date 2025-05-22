@@ -17,6 +17,8 @@ DATABASE_URL= "db_url"
 BOTTOKEN = "token"
 ```
 
+Also, remember to have Docker installed and running!!
+
 ### Run project
 1. Go to the "backend" folder
 2. Build containers: 
@@ -35,7 +37,18 @@ BOTTOKEN = "token"
 To interact with the bot:
 1. Create a telegram group
 2. Go to add member
-3. Search for CatS bot and add
+3. Search for _CatS\_extension\_bot_ and add it
 4. Start communication with /start
 
 (Remember that to interact with the bot the project must be running first)
+
+
+### Stop and restart the project
+
+In case that you need to shut down de project and restart, run the follow commands to ensure that the docker cache do not affect in the execute:
+
+```
+docker-compose down --remove-orphans
+docker image prune -a
+docker-compose up --build
+```
