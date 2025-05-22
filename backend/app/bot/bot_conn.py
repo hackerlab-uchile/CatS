@@ -24,12 +24,17 @@ def show_action_menu(chat_id, db):
     markup = InlineKeyboardMarkup()
     tag = db.query(Tag).filter_by(community_id=chat_id).first() 
     url = db.query(Url).filter_by(community_id=chat_id).first() 
-    if tag is None:
+    community = db.query(Community).filter_by(id=chat_id).first() 
+    if community is None:
+        user_states[chat_id] = {'step': 'ask_name'}
+        bot.send_message(chat_id, "No existe una comunidad asociada a este chat, ingresa el nombre de la comunidad a registrar:")
+    elif tag is None:
         markup.add(
             InlineKeyboardButton("Crear tag", callback_data=f"action_create_tag"),
             InlineKeyboardButton("No, Eliminar Comunidad", callback_data="confirm_delete_community")
             )
         bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
+        user_states[chat_id] = {'step': 'choose_action'}
     elif url is None:
         markup.add(
             InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
@@ -38,6 +43,7 @@ def show_action_menu(chat_id, db):
             InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
         )        
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
+        user_states[chat_id] = {'step': 'choose_action'}
     else:
         markup.add(
             InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
@@ -47,7 +53,7 @@ def show_action_menu(chat_id, db):
             InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
         )        
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
-    user_states[chat_id] = {'step': 'choose_action'}
+        user_states[chat_id] = {'step': 'choose_action'}
 
 
 @bot.message_handler(func=lambda message: bot.get_me().username in message.text)
@@ -425,19 +431,19 @@ def delete_tag(call):
         bot.answer_callback_query(call.id, "Tag no encontrado.", show_alert=True)
 
 # ask confirmation delete community 
-@bot.callback_query_handler(func=lambda call: call.data == "confirm_delete_community_")
+@bot.callback_query_handler(func=lambda call: call.data == "confirm_delete_community")
 def ask_confirm_community_delete(call):
     chat_id = call.message.chat.id
     markup = InlineKeyboardMarkup()
     markup.add(
         InlineKeyboardButton("⚠️ Sí, eliminar comunidad", callback_data="delete_community"),
-        InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete_community")
+        InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete")
     )
     bot.edit_message_text("⚠️ ¿Estás segurx de que deseas eliminar toda la comunidad? Esto eliminará todos los tags y URLs asociados.", chat_id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
 
-@bot.callback_query_handler(func=lambda call: call.data == "delete_community_")
+@bot.callback_query_handler(func=lambda call: call.data == "delete_community")
 def ask_confirm_delete_community(call):
     chat_id = call.message.chat.id
     db = next(get_db())
