@@ -11,7 +11,8 @@ tag_url = Table(
     "tag_url",
     Base.metadata,
     Column("tag_id", Integer, ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True),
-    Column("url_id", Integer, ForeignKey("url.id", ondelete="CASCADE"), primary_key=True),extend_existing=True
+    Column("url_id", Integer, ForeignKey("url.id", ondelete="CASCADE"), primary_key=True),
+    extend_existing=True
 )
 
 class Community(Base):
@@ -36,7 +37,7 @@ class Tag(Base):
     community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
 
     community = relationship("Community", back_populates="tags")
-    urls = relationship("Url", secondary=tag_url, back_populates="tags")
+    urls = relationship("Url", secondary=tag_url, back_populates="tags", cascade="all")
 
 class Url(Base):
     __tablename__ = "url"
@@ -48,7 +49,7 @@ class Url(Base):
     tag_id = Column(Integer, ForeignKey("tag.id", ondelete="CASCADE"))
 
     community = relationship("Community", back_populates="urls")
-    tags = relationship("Tag", secondary=tag_url, back_populates="urls")
+    tags = relationship("Tag", secondary=tag_url, back_populates="urls", cascade="all")
     revisions = relationship("Revision", back_populates="url")
 
 class Revision(Base):
