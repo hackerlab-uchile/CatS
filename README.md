@@ -15,6 +15,10 @@ DATABASE_URL= "db_url"
 
 # ---- Backend ----
 BOTTOKEN = "token"
+
+# ---- Length fields ----
+LENNAMES = "50"
+LENDESC = "150"
 ```
 
 Also, remember to have Docker installed and running!!

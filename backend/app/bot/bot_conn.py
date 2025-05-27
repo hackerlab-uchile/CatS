@@ -2,7 +2,7 @@ import telebot
 import os
 from app.database import get_db
 from app.models import Community, Tag, Url
-from app.bot.utils import is_valid_url
+from app.bot.utils import is_valid_url, is_valid_name
 from sqlalchemy.exc import SQLAlchemyError
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -12,6 +12,13 @@ bot = telebot.TeleBot(TOKEN)
 
 # Default server IP (for all communities)
 IPSERVER = os.getenv("SERVER_IP")
+
+# Length name fields
+LENNAMES = int(os.getenv("LENNAMES"))
+LENDESC = int(os.getenv("LENDESC"))
+
+# Function that page existing tags
+TAGS_PER_PAGE = 3
 
 # Dictionary to save the state per chat
 user_states = {}
@@ -87,9 +94,15 @@ def handle_start(message):
 def handle_name(message):
     chat_id = message.chat.id
     name = message.text.strip()
-    user_states[chat_id] = {'step': 'ask_description', 'name': name}
-    print(f"Estado actualizado a 'ask_description' para {chat_id}. Nombre: {name}") 
-    bot.send_message(chat_id, "Ahora ingresa una descripción para la comunidad:")
+
+    if not is_valid_name(name, LENNAMES):
+        bot.send_message(chat_id, f"Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, "Ingresa el nombre de la comunidad a registrar:")
+        user_states[chat_id] = {'step': 'ask_name'}
+    else:
+        user_states[chat_id] = {'step': 'ask_description', 'name': name}
+        print(f"Estado actualizado a 'ask_description' para {chat_id}. Nombre: {name}") 
+        bot.send_message(chat_id, "Ahora ingresa una descripción para la comunidad:")
 
 
 # Descripton reseption and community creation
@@ -138,15 +151,20 @@ def handle_fill_tag_name(message):
     chat_id = message.chat.id
     tag_name = message.text.strip()
 
-    # check if exits a tag with that name in this community
-    db = next(get_db())
-    existing_tag = db.query(Tag).filter_by(name=tag_name, community_id=chat_id).first()
-    if existing_tag:
-        bot.send_message(chat_id, f"⚠️ Ya existe un tag llamado '{tag_name}' en esta comunidad. Por favor ingresa otro nombre para el tag:")
-        show_action_menu(chat_id, db)
+    if not is_valid_name(tag_name, LENNAMES):
+        bot.send_message(chat_id, f"⚠️ Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:")
+        user_states[chat_id] = {'step': 'fill_tag'}
     else:
-        user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
-        bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
+        # check if exits a tag with that name in this community
+        db = next(get_db())
+        existing_tag = db.query(Tag).filter_by(name=tag_name, community_id=chat_id).first()
+        if existing_tag:
+            bot.send_message(chat_id, f"⚠️ Ya existe un tag llamado '{tag_name}' en esta comunidad. Por favor ingresa otro nombre para el tag:")
+            user_states[chat_id] = {'step': 'fill_tag'}
+        else:
+            user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
+            bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
 
 # -> get tag description and ask action of the tag
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_tag_description')
@@ -156,15 +174,19 @@ def handle_fill_tag_description(message):
     state = user_states.get(chat_id, {})
     tag_name = state.get('tag_name')
 
-    user_states[chat_id] = {'step': 'fill_tag_action', 'tag_name':tag_name, 'tag_description': tag_description}
+    if not is_valid_name(tag_description, LENDESC):
+        bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
+        user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
+    else:
 
-    markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton("🔒 Block", callback_data="tag_action_block"),
-        InlineKeyboardButton("⚠️ Alert", callback_data="tag_action_alert"),
-        InlineKeyboardButton("🔔 Notification", callback_data="tag_action_notification")
-    )
-    bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("🔒 Block", callback_data="tag_action_block"),
+            InlineKeyboardButton("⚠️ Alert", callback_data="tag_action_alert"),
+            InlineKeyboardButton("🔔 Notification", callback_data="tag_action_notification")
+        )
+        bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
 
 # -> get tag action and add tag to database
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tag_action_"))
@@ -189,9 +211,6 @@ def handle_tag_action_selection(call):
         user_states.pop(chat_id, None)
         show_action_menu(chat_id, db)
 
-
-# Function that page existing tags
-TAGS_PER_PAGE = 3
 
 def show_tag_buttons(chat_id, page=0):
     db = next(get_db())
@@ -273,18 +292,24 @@ def handle_fill_url_justification(message):
     url_address = state.get('url')
     url_tag =  state.get('tag')
     justification = message.text.strip()
-    try:
-        db = next(get_db())
-        tag = db.query(Tag).filter_by(name=url_tag, community_id=chat_id).first()
-        community = db.query(Community).filter_by(id=chat_id).first()
-        new_url = Url(url=url_address, justification=justification, community_id=community.id, tag_id=tag.id)
-        db.add(new_url); db.commit()
-        bot.send_message(chat_id, f"URL '{url_address}' agregada!")
-    except SQLAlchemyError as e:
-        bot.send_message(chat_id, f"Error guardando URL: {e}")
-    finally:
-        user_states.pop(chat_id, None)
-        show_action_menu(chat_id, db)
+
+    if not is_valid_name(justification, LENDESC):
+        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, "Ingresa una justificación para la URL:")
+        user_states[chat_id] = {'step': 'fill_url_justification', 'url': url_address, 'tag': url_tag}
+    else:
+        try:
+            db = next(get_db())
+            tag = db.query(Tag).filter_by(name=url_tag, community_id=chat_id).first()
+            community = db.query(Community).filter_by(id=chat_id).first()
+            new_url = Url(url=url_address, justification=justification, community_id=community.id, tag_id=tag.id)
+            db.add(new_url); db.commit()
+            bot.send_message(chat_id, f"URL '{url_address}' agregada!")
+        except SQLAlchemyError as e:
+            bot.send_message(chat_id, f"Error guardando URL: {e}")
+        finally:
+            user_states.pop(chat_id, None)
+            show_action_menu(chat_id, db)
 
 
 # -- EDIT URL --
@@ -336,17 +361,23 @@ def save_new_justification(message):
     chat_id = message.chat.id
     new_just = message.text.strip()
     url_id = user_states[chat_id]['url_id']
-    try:
-        db = next(get_db())
-        url_entry = db.query(Url).filter_by(id=url_id).first()
-        url_entry.justification = new_just
-        db.commit()
-        bot.send_message(chat_id, "Justificación actualizada correctamente.")
-    except SQLAlchemyError as e:
-        bot.send_message(chat_id, f"Error al actualizar: {e}")
-    finally:
-        user_states.pop(chat_id, None)
-        show_action_menu(chat_id, db)
+
+    if not is_valid_name(new_just, LENDESC):
+        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, "Ingresa una justificación para la URL:")
+        user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
+    else:
+        try:
+            db = next(get_db())
+            url_entry = db.query(Url).filter_by(id=url_id).first()
+            url_entry.justification = new_just
+            db.commit()
+            bot.send_message(chat_id, "Justificación actualizada correctamente.")
+        except SQLAlchemyError as e:
+            bot.send_message(chat_id, f"Error al actualizar: {e}")
+        finally:
+            user_states.pop(chat_id, None)
+            show_action_menu(chat_id, db)
 
 # change url's tag
 @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_tag_"))

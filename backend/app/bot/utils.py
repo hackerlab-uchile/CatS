@@ -1,4 +1,5 @@
 import re
+import os
 from urllib.parse import urlparse
 
 def is_valid_url(url: str) -> bool:
@@ -22,3 +23,21 @@ def is_valid_url(url: str) -> bool:
         return True
     except Exception:
         return False
+    
+def is_valid_name(name: str, max_length: int) -> bool:
+    """
+    Function to sanitize a name field:
+        - Do not be empty
+        - Have length between 1 and `max_length`.
+        - Contain only letters, numbers, spaces, hyphens and underscores
+    """
+    name = name.strip()
+
+    # min/max length
+    if not (1 <= len(name) <= max_length):
+        return False
+
+    # Only letters, numbers, spaces, - and _
+    if not re.match(r"^[\w\s\-]+$", name, re.UNICODE):
+        return False
+    return True
