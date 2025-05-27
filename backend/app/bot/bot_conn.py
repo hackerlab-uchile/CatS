@@ -179,7 +179,6 @@ def handle_fill_tag_description(message):
         bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
         user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
     else:
-
         markup = InlineKeyboardMarkup()
         markup.add(
             InlineKeyboardButton("🔒 Block", callback_data="tag_action_block"),
@@ -187,6 +186,7 @@ def handle_fill_tag_description(message):
             InlineKeyboardButton("🔔 Notification", callback_data="tag_action_notification")
         )
         bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
+        user_states[chat_id] = {'step': 'tag_action_', 'tag_name':tag_name, 'tag_description': tag_description}
 
 # -> get tag action and add tag to database
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tag_action_"))
