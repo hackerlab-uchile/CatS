@@ -6,6 +6,7 @@ from app.bot.utils import is_valid_url, is_valid_name
 from sqlalchemy.exc import SQLAlchemyError
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 
+# ------------------------------------------- Global variables section ----------------------------------------------
 # Bot setup
 TOKEN = os.getenv("BOTTOKEN")
 bot = telebot.TeleBot(TOKEN)
@@ -23,10 +24,14 @@ TAGS_PER_PAGE = 3
 # Dictionary to save the state per chat
 user_states = {}
 
-BOT_USERNAME = bot.get_me().username 
-print(BOT_USERNAME)
-#Intructions
+# ------------------------------------------------------------------------------------------------------------------
+
+# --------------------------------------------- Functions section --------------------------------------------------
+
 def instrucciones_text():
+    """
+    Function that returns the intructions for use of the bot
+    """
     return (
         "👋 *Bienvenidx a CatS bot!*\n"
         "Con este bot podrás crear y gestionar tu comunidad 😺 \n"
@@ -44,32 +49,34 @@ def instrucciones_text():
         "🧹 *Eliminar tag:* Permite eliminar un tag dentro de la lista de tags creados. ⚠️¡Esto eliminará todas las URLs asociadas exclusivamente a ese tag!⚠️\n"
         "🧹 *Eliminar Comunidad:* Permite eliminar la comunidad asociada al chat. ⚠️¡Esto eliminará todos los tags y URLs creados en este chat!⚠️\n\n"
 
+        "<<Para responder a la petición de nombres, descripciones y justificaciones, debes enviar tu mensaje *respondiendo* el mensaje del bot>>"
+
         "⚙️ Usa el botón de menú (Invócalo con */start*) para ver las acciones disponibles.\n"
         "ℹ️ Ante dudas, envía */help* para volver a ver estas instrucciones."
     )
 
-@bot.message_handler(content_types=['new_chat_members'])
-def welcome_new_members(message):
-    for member in message.new_chat_members:
-        if member.id == bot.get_me().id:
-            bot.send_message(
-                message.chat.id,
-                "👋 ¡Hola! Soy CatS bot.\n"
-                "Escribe /help para ver qué puedo hacer. ",
-                parse_mode="Markdown"
-            )
 
-
-# Show use instructions when the bot is called
-@bot.message_handler(commands=['help'])
-def handle_bot_mention(message):
-    chat_id = message.chat.id
-    bot.send_message(chat_id, instrucciones_text(), parse_mode="Markdown")
-
-# Fuction to show the action menu (create tag or add url)
 def show_action_menu(chat_id, db):
     """
-    Send a menu appropriate to the chat conditions
+    Options menu, sends buttons with options to execute depending on the context of the chat.
+    If you have not created a community:
+        - redirects to the process of creating one.
+    If no tag:
+        - Create tag
+        - Delete community
+    If there is at least 1 tag:
+        - Create tag
+        - view tags
+        - delete tag
+        - create url
+        - delete community
+    If there is at least 1 url:
+        - Create tag
+        - view tags
+        - delete tag
+        - create url
+        - view/edit url
+        - delete community
     """
     markup = InlineKeyboardMarkup()
     tag = db.query(Tag).filter_by(community_id=chat_id).first() 
@@ -105,7 +112,74 @@ def show_action_menu(chat_id, db):
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
 
 
-# /start handler
+def show_tag_buttons(chat_id, page=0):
+    """
+    Creates catalog showing all existing tags paginated
+
+    Inputs:
+    -------
+    page: int
+        number of the displayed page, by default it starts at 0
+    """
+    db = next(get_db())
+    tags = db.query(Tag).filter_by(community_id=chat_id).all()
+    start = page * TAGS_PER_PAGE
+    end = start + TAGS_PER_PAGE
+    page_tags = tags[start:end]
+
+    markup = InlineKeyboardMarkup()
+    for tag in page_tags:
+        markup.add(InlineKeyboardButton(tag.name, callback_data=f"select_tag:{tag.name}"))
+
+    # Page layout
+    nav_buttons = []
+    if start > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"page:{page-1}"))
+    if end < len(tags):
+        nav_buttons.append(InlineKeyboardButton("Siguiente ➡️", callback_data=f"page:{page+1}"))
+
+    if nav_buttons:
+        markup.row(*nav_buttons)
+
+    bot.send_message(chat_id, "Selecciona un tag para esta URL:", reply_markup=markup)
+
+# Manage the page layout when the ➡️ (Next or previus) button is selected
+@bot.callback_query_handler(func=lambda call: call.data.startswith("page:"))
+def handle_page_navigation(call):
+    chat_id = call.message.chat.id
+    page = int(call.data.split(":")[1])
+
+    # Delete the previous message with buttons before sending the new message
+    bot.delete_message(chat_id, call.message.message_id)
+
+    # Show the next page
+    show_tag_buttons(chat_id, page=page)
+
+# ------------------------------------------------------------------------------------------------------------------
+
+# --------------------------------------------- Bot flow section ---------------------------------------------------
+
+# Welcome message, sent when the bot is added for the first time or a new member is added to the group.
+@bot.message_handler(content_types=['new_chat_members'])
+def welcome_new_members(message):
+    for member in message.new_chat_members:
+        if member.id == bot.get_me().id:
+            bot.send_message(
+                message.chat.id,
+                "👋 ¡Hola! Soy CatS bot.\n"
+                "Escribe /help para ver qué puedo hacer.",
+                parse_mode="Markdown"
+            )
+
+
+# Show use instructions when the command /help is sended
+@bot.message_handler(commands=['help'])
+def handle_bot_mention(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id, instrucciones_text(), parse_mode="Markdown")
+
+
+# /start handler, if not community, ask for create one, else show action menu
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     chat = message.chat
@@ -129,12 +203,13 @@ def handle_start(message):
         show_action_menu(chat_id, db)
 
 
-# Name reseption and ask for community description
+# Community name reseption and ask for community description
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'ask_name')
 def handle_name(message):
     chat_id = message.chat.id
     name = message.text.strip()
 
+    # sanitization of the name
     if not is_valid_name(name, LENNAMES):
         bot.send_message(chat_id, f"Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa el nombre de la comunidad a registrar:")
@@ -144,19 +219,21 @@ def handle_name(message):
         user_states[chat_id] = {'step': 'ask_description', 'name': name} 
 
 
-# Descripton reseption and community creation
+# Community descripton reseption and community creation
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'ask_description')
 def handle_description(message):
     chat_id = message.chat.id
     description = message.text.strip()
     name = user_states.get(chat_id, {}).get('name')
 
+    # description sanitization
     if not is_valid_name(description, LENDESC):
         bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa una descripción para la comunidad:")
         user_states[chat_id] = {'step': 'ask_description', 'name': name}
     else:
         try:
+            # add new community
             db = next(get_db())
             community = Community(
                 id=chat_id,
@@ -175,7 +252,7 @@ def handle_description(message):
             show_action_menu(chat_id, db)
 
 
-# Action choise
+# Action choise (fill_tag or fill_url): ask for the name of the tag or address or the URL respectively
 @bot.callback_query_handler(func=lambda call: call.data.startswith("action_"))
 def handle_action_menu(call):
     chat_id = call.message.chat.id
@@ -189,19 +266,21 @@ def handle_action_menu(call):
         user_states[chat_id] = {'step': 'fill_url'}
         bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:")
 
-# -- FILL TAG --
-# -> get tag name and ask tag description
+
+# ----- FILL TAG -----
+# Tag name reseption and ask for tag description
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_tag')
 def handle_fill_tag_name(message):
     chat_id = message.chat.id
     tag_name = message.text.strip()
 
+    # name sanitization
     if not is_valid_name(tag_name, LENNAMES):
         bot.send_message(chat_id, f"⚠️ Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:")
         user_states[chat_id] = {'step': 'fill_tag'}
     else:
-        # check if exits a tag with that name in this community
+        # check if exits a tag with that name in this community, if so, ask again for the tag name
         db = next(get_db())
         existing_tag = db.query(Tag).filter_by(name=tag_name, community_id=chat_id).first()
         if existing_tag:
@@ -211,7 +290,7 @@ def handle_fill_tag_name(message):
             user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
             bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
 
-# -> get tag description and ask action of the tag
+# tag description reseption and ask for tag action
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_tag_description')
 def handle_fill_tag_description(message):
     chat_id = message.chat.id
@@ -219,6 +298,7 @@ def handle_fill_tag_description(message):
     state = user_states.get(chat_id, {})
     tag_name = state.get('tag_name')
 
+    # description sanitization
     if not is_valid_name(tag_description, LENDESC):
         bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
@@ -233,7 +313,7 @@ def handle_fill_tag_description(message):
         bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
         user_states[chat_id] = {'step': 'tag_action_', 'tag_name':tag_name, 'tag_description': tag_description}
 
-# -> get tag action and add tag to database
+# tag action reseption and add tag to database
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tag_action_"))
 def handle_tag_action_selection(call):
     chat_id = call.message.chat.id
@@ -241,9 +321,12 @@ def handle_tag_action_selection(call):
     tag_name = state.get('tag_name')    
     tag_description = state.get('tag_description') 
     action = call.data.replace("tag_action_","")
+
+    # Delete the msg with the buttons to void confusion
     bot.delete_message(chat_id, call.message.message_id)
 
     try:
+        #add new tag
         db = next(get_db())
         community = db.query(Community).filter_by(id=chat_id).first()
         new_tag = Tag(name=tag_name, action=action, description=tag_description, community_id=community.id)
@@ -253,20 +336,23 @@ def handle_tag_action_selection(call):
     except SQLAlchemyError as e:
         bot.send_message(chat_id, f"Error al guardar el tag: {e}")
     finally:
+        # Clean state and show menu action
         user_states.pop(chat_id, None)
         show_action_menu(chat_id, db)
 
 
-# --- View tags ---
+# ----- View tags -----
 @bot.callback_query_handler(func=lambda call: call.data == "view_tags")
 def handle_view_tags(call):
     chat_id = call.message.chat.id
     db = next(get_db())
 
+    # Delete the msg with the buttons to void confusion
     bot.delete_message(chat_id, call.message.message_id)
 
     tags = db.query(Tag).filter_by(community_id=chat_id).all()
 
+    # button with tag info per tag
     for tag in tags:
         text = (
             f"🏷️ *Tag:* {tag.name}\n"
@@ -278,52 +364,18 @@ def handle_view_tags(call):
     bot.answer_callback_query(call.id)
 
 
-def show_tag_buttons(chat_id, page=0):
-    db = next(get_db())
-    tags = db.query(Tag).filter_by(community_id=chat_id).all()
-    start = page * TAGS_PER_PAGE
-    end = start + TAGS_PER_PAGE
-    page_tags = tags[start:end]
-
-    markup = InlineKeyboardMarkup()
-    for tag in page_tags:
-        markup.add(InlineKeyboardButton(tag.name, callback_data=f"select_tag:{tag.name}"))
-
-    # Page layout
-    nav_buttons = []
-    if start > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"page:{page-1}"))
-    if end < len(tags):
-        nav_buttons.append(InlineKeyboardButton("Siguiente ➡️", callback_data=f"page:{page+1}"))
-
-    if nav_buttons:
-        markup.row(*nav_buttons)
-
-    bot.send_message(chat_id, "Selecciona un tag para esta URL:", reply_markup=markup)
-
-# Manage the page layout
-@bot.callback_query_handler(func=lambda call: call.data.startswith("page:"))
-def handle_page_navigation(call):
-    chat_id = call.message.chat.id
-    page = int(call.data.split(":")[1])
-
-    # Delete the previous message with buttons before sending the new message
-    bot.delete_message(chat_id, call.message.message_id)
-
-    # Show the next page
-    show_tag_buttons(chat_id, page=page)
-
-
-# -- FILL URL --
-# -> url address
+# ----- FILL URL -----
+# url address reseption and ask for tag
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_url')
 def handle_fill_url_address(message):
     chat_id = message.chat.id
     url = message.text.strip()
 
+    # if do not have http or https add it
     if not url.startswith(('http://', 'https://')):
         url = 'http://' + url
 
+    # url sanitization
     if not is_valid_url(url):
         bot.send_message(chat_id, "🚫 La URL ingresada no es válida o es privada. Intenta con una dirección como `https://ejemplo.com`.")
         bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:")
@@ -333,7 +385,7 @@ def handle_fill_url_address(message):
         user_states[chat_id] = {'step': 'fill_url_tag', 'url': url}
         show_tag_buttons(chat_id, page=0)
 
-
+# url tag reseption and ask for justification
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_tag:"))
 def handle_tag_selection(call):
     chat_id = call.message.chat.id
@@ -350,7 +402,7 @@ def handle_tag_selection(call):
     bot.send_message(chat_id, f"Seleccionaste el tag '{tag_name}'. Ahora ingresa una justificación para esta URL:")
 
 
-# -> url justification
+# url justification reseption and add tag to database
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_url_justification')
 def handle_fill_url_justification(message):
     chat_id = message.chat.id
@@ -359,12 +411,14 @@ def handle_fill_url_justification(message):
     url_tag =  state.get('tag')
     justification = message.text.strip()
 
+    # justification sanitization
     if not is_valid_name(justification, LENDESC):
         bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'fill_url_justification', 'url': url_address, 'tag': url_tag}
     else:
         try:
+            # add new url
             db = next(get_db())
             tag = db.query(Tag).filter_by(name=url_tag, community_id=chat_id).first()
             community = db.query(Community).filter_by(id=chat_id).first()
@@ -374,19 +428,22 @@ def handle_fill_url_justification(message):
         except SQLAlchemyError as e:
             bot.send_message(chat_id, f"Error guardando URL: {e}")
         finally:
+            # Clean state and show menu action
             user_states.pop(chat_id, None)
             show_action_menu(chat_id, db)
 
 
-# -- EDIT URL --
+# ----- EDIT URL -----
 @bot.callback_query_handler(func=lambda call: call.data == "manage_urls")
 def handle_manage_urls(call):
     chat_id = call.message.chat.id
     db = next(get_db())
     urls = db.query(Url).filter_by(community_id=chat_id).all()
-    
+
+    # Delete the msg with the buttons to void confusion 
     bot.delete_message(chat_id, call.message.message_id)
 
+    # show urls
     for url in urls:
         tag_id =url.tag_id
         tag = db.query(Tag).filter_by(community_id=chat_id, id=tag_id).first()
@@ -399,6 +456,7 @@ def handle_manage_urls(call):
         bot.send_message(chat_id, text, reply_markup=markup)
 
     bot.answer_callback_query(call.id)
+
 
 # Action buttons for edit url
 @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_url_"))
@@ -431,19 +489,21 @@ def edit_url_justification(call):
     user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
     bot.send_message(chat_id, "Escribe la nueva justificación:")
 
-
+# new url justificacion reseption  and update url
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'editing_just')
 def save_new_justification(message):
     chat_id = message.chat.id
     new_just = message.text.strip()
     url_id = user_states[chat_id]['url_id']
 
+    # new justification sanitization
     if not is_valid_name(new_just, LENDESC):
         bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
     else:
         try:
+            # update url
             db = next(get_db())
             url_entry = db.query(Url).filter_by(id=url_id).first()
             url_entry.justification = new_just
@@ -462,12 +522,15 @@ def handle_change_tag_request(call):
     url_id = int(call.data.split("_")[-1])
     db = next(get_db())
     tags = db.query(Tag).filter_by(community_id=chat_id).all()
+
+    # show buttons with tags
     markup = InlineKeyboardMarkup()
     for tag in tags:
         markup.add(InlineKeyboardButton(tag.name, callback_data=f"set_new_tag_{url_id}_{tag.id}"))
     bot.edit_message_text("Selecciona el nuevo tag para la URL:", chat_id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
+# new url tag reseption and update url
 @bot.callback_query_handler(func=lambda call: call.data.startswith("set_new_tag_"))
 def set_new_tag(call):
     parts = call.data.split("_")
@@ -485,7 +548,7 @@ def set_new_tag(call):
     bot.answer_callback_query(call.id)
     show_action_menu(chat_id, db)
 
-# Drop url
+# ask confirmation for delete url
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_url_"))
 def confirm_delete_url(call):
     url_id = int(call.data.split("_")[-1])
@@ -493,6 +556,7 @@ def confirm_delete_url(call):
     db = next(get_db())
     url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
 
+    # shows confirmation of deletion buttons
     markup = InlineKeyboardMarkup()
     markup.add(
         InlineKeyboardButton("✅ Sí, eliminar", callback_data=f"confirm_delete_url_{url_id}"),
@@ -501,6 +565,7 @@ def confirm_delete_url(call):
     bot.edit_message_text(f"¿Estás segurx que deseas eliminar la URL {url.url}?", chat_id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
+# delete url
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_delete_url_"))
 def delete_url(call):
     url_id = int(call.data.split("_")[-1])
@@ -564,7 +629,7 @@ def ask_confirm_community_delete(call):
     bot.edit_message_text("⚠️ ¿Estás segurx de que deseas eliminar toda la comunidad? Esto eliminará todos los tags y URLs asociados.", chat_id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
-
+# delete community
 @bot.callback_query_handler(func=lambda call: call.data == "delete_community")
 def ask_confirm_delete_community(call):
     chat_id = call.message.chat.id
