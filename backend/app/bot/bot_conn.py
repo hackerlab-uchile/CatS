@@ -212,14 +212,14 @@ def handle_name(message):
     # sanitization of the name
     if not is_valid_name(name, LENNAMES):
         bot.send_message(chat_id, f"Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
-        bot.send_message(chat_id, "Ingresa el nombre de la comunidad a registrar:")
+        bot.send_message(chat_id, "Ingresa el nombre de la comunidad a registrar:", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'ask_name'}
     else:
-        bot.send_message(chat_id, "Ahora ingresa una descripción para la comunidad:")
+        bot.send_message(chat_id, "Ahora ingresa una descripción para la comunidad:", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'ask_description', 'name': name} 
 
 
-# Community descripton reseption and community creation
+# Community description reseption and community creation
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'ask_description')
 def handle_description(message):
     chat_id = message.chat.id
@@ -229,7 +229,7 @@ def handle_description(message):
     # description sanitization
     if not is_valid_name(description, LENDESC):
         bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
-        bot.send_message(chat_id, "Ingresa una descripción para la comunidad:")
+        bot.send_message(chat_id, "Ingresa una descripción para la comunidad:", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'ask_description', 'name': name}
     else:
         try:
@@ -261,7 +261,7 @@ def handle_action_menu(call):
 
     if action == "action_create_tag":
         user_states[chat_id] = {'step': 'fill_tag'}
-        bot.send_message(chat_id, "Ingresa el nombre del nuevo tag:")
+        bot.send_message(chat_id, "Ingresa el nombre del nuevo tag:", reply_markup=ForceReply(selective=True))
     else:
         user_states[chat_id] = {'step': 'fill_url'}
         bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:")
@@ -277,7 +277,7 @@ def handle_fill_tag_name(message):
     # name sanitization
     if not is_valid_name(tag_name, LENNAMES):
         bot.send_message(chat_id, f"⚠️ Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
-        bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:")
+        bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'fill_tag'}
     else:
         # check if exits a tag with that name in this community, if so, ask again for the tag name
@@ -288,7 +288,7 @@ def handle_fill_tag_name(message):
             user_states[chat_id] = {'step': 'fill_tag'}
         else:
             user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
-            bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
+            bot.send_message(chat_id, "Ingresa una descripción para el Tag:", reply_markup=ForceReply(selective=True))
 
 # tag description reseption and ask for tag action
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_tag_description')
