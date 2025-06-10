@@ -1,10 +1,11 @@
 import telebot
+import threading
 import os
 from app.database import get_db
 from app.models import Community, Tag, Url
 from app.bot.utils import is_valid_url, is_valid_name
 from sqlalchemy.exc import SQLAlchemyError
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply, PollAnswer
 
 # ------------------------------------------- Global variables section ----------------------------------------------
 # Bot setup
@@ -154,6 +155,88 @@ def handle_page_navigation(call):
 
     # Show the next page
     show_tag_buttons(chat_id, page=page)
+
+
+poll_results = {}  # poll_id -> [votes]
+
+def launch_approval_survey(chat_id, question, options, object_type, data):
+    """
+    Launches a survey and temporarily saves the related info to process the response.
+    """
+    message = bot.send_poll(
+        chat_id,
+        question,
+        options,
+        is_anonymous=False,
+        allows_multiple_answers=False
+    )
+    poll_id = message.poll.id
+    user_states[chat_id] = {
+        'step': 'wait_approval',
+        'object_type': object_type,  # 'tag' o 'url'
+        'data': data,
+        'poll_id': poll_id,
+        'message_id': message.message_id
+    }
+    poll_results[poll_id] = []
+    threading.Timer(60, check_survey_result, args=[chat_id]).start()
+    bot.send_message(chat_id, "Se esperará 1 minuto para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
+
+
+# Function that receive the vote
+@bot.poll_answer_handler()
+def handle_poll_answer(poll_answer: PollAnswer):
+    poll_id = poll_answer.poll_id # unique id of the response
+    selected_option = poll_answer.option_ids[0] # index of the voted option (0 = "Sí", 1 = "No")
+    poll_results.setdefault(poll_id, []).append(selected_option) # add vote to the results register
+    print(f"Recibido voto en encuesta {poll_answer.poll_id}: opción {poll_answer.option_ids[0]}")
+
+def check_survey_result(chat_id):
+    """
+    Checks the result of the survey, if 60 percent of the answers are “yes” the appropriate function is called (save_url or save_tag),
+      on the other hand, if the answer is “no” it is cancelled. Finally, the action menu is called.
+    """
+    state = user_states.get(chat_id, {})
+    poll_id = state.get('poll_id')
+    votes = poll_results.get(poll_id, [])
+
+    if not votes:
+        percentage = 0
+    else:
+        approvals = votes.count(0)
+        percentage = approvals / len(votes)
+
+    if percentage >= 0.5:
+        type = state.get('object_type')
+        data = state.get('data')
+        if type== "tag":
+            save_tag(chat_id, data)
+        elif type == "url":
+            save_url(chat_id, data)
+        elif type == "edit_url":
+            edit_type = data.get("type")
+            url_id = data.get("url_id")
+            new_value = data.get("new_value")
+            db = next(get_db())
+            url_entry = db.query(Url).filter_by(id=url_id).first()
+
+            if url_entry:
+                if edit_type == "justification":
+                    url_entry.justification = new_value
+                elif edit_type == "tag":
+                    url_entry.tag_id = new_value
+                db.commit()
+                bot.send_message(chat_id, "✅ Edición aplicada correctamente.")
+            else:
+                bot.send_message(chat_id, "❌ No se encontró la URL para editar.")
+    else:
+        bot.send_message(chat_id, "❌ La propuesta fue rechazada por la comunidad.")
+    print(f"Votos registrados para poll {poll_id}: {votes}")
+    poll_results.pop(poll_id, None)
+    user_states.pop(chat_id, None)
+    db = next(get_db())
+    show_action_menu(chat_id, db)
+
 
 # ------------------------------------------------------------------------------------------------------------------
 
@@ -313,7 +396,7 @@ def handle_fill_tag_description(message):
         bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
         user_states[chat_id] = {'step': 'tag_action_', 'tag_name':tag_name, 'tag_description': tag_description}
 
-# tag action reseption and add tag to database
+# tag action reseption
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tag_action_"))
 def handle_tag_action_selection(call):
     chat_id = call.message.chat.id
@@ -325,20 +408,42 @@ def handle_tag_action_selection(call):
     # Delete the msg with the buttons to void confusion
     bot.delete_message(chat_id, call.message.message_id)
 
+    # Guardar info y lanzar encuesta
+    question = f"¿Aprobar el nuevo tag: '{tag_name}' con acción: '{action}' y descripción: '{tag_description}'?"
+    options = ["✅ Sí", "❌ No"]
+    data = {
+        'tag_name': tag_name,
+        'tag_description': tag_description,
+        'action': action
+    }
+    launch_approval_survey(chat_id, question, options, object_type="tag", data=data)
+
+
+def save_tag(chat_id, data):
+    """
+    function in charge of storing the tag in the database
+
+    Inputs:
+    -------
+    chat_id: int
+        ID of the chat
+    data: dict
+        Data of the tag to save
+    """
     try:
-        #add new tag
         db = next(get_db())
         community = db.query(Community).filter_by(id=chat_id).first()
-        new_tag = Tag(name=tag_name, action=action, description=tag_description, community_id=community.id)
+        new_tag = Tag(
+            name=data['tag_name'],
+            description=data['tag_description'],
+            action=data['action'],
+            community_id=community.id
+        )
         db.add(new_tag)
         db.commit()
-        bot.send_message(chat_id, f"Tag '{tag_name}' con acción '{action}' agregado a '{community.name}'.")
+        bot.send_message(chat_id, f"✅ Tag '{data['tag_name']}' agregado exitosamente.")
     except SQLAlchemyError as e:
-        bot.send_message(chat_id, f"Error al guardar el tag: {e}")
-    finally:
-        # Clean state and show menu action
-        user_states.pop(chat_id, None)
-        show_action_menu(chat_id, db)
+        bot.send_message(chat_id, f"❌ Error al guardar el tag: {e}")
 
 
 # ----- View tags -----
@@ -402,7 +507,7 @@ def handle_tag_selection(call):
     bot.send_message(chat_id, f"Seleccionaste el tag '{tag_name}'. Ahora ingresa una justificación para esta URL:")
 
 
-# url justification reseption and add tag to database
+# url justification reseption
 @bot.message_handler(func=lambda m: user_states.get(m.chat.id, {}).get('step') == 'fill_url_justification')
 def handle_fill_url_justification(message):
     chat_id = message.chat.id
@@ -417,21 +522,42 @@ def handle_fill_url_justification(message):
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'fill_url_justification', 'url': url_address, 'tag': url_tag}
     else:
-        try:
-            # add new url
-            db = next(get_db())
-            tag = db.query(Tag).filter_by(name=url_tag, community_id=chat_id).first()
-            community = db.query(Community).filter_by(id=chat_id).first()
-            new_url = Url(url=url_address, justification=justification, community_id=community.id, tag_id=tag.id)
-            db.add(new_url); db.commit()
-            bot.send_message(chat_id, f"URL '{url_address}' agregada!")
-        except SQLAlchemyError as e:
-            bot.send_message(chat_id, f"Error guardando URL: {e}")
-        finally:
-            # Clean state and show menu action
-            user_states.pop(chat_id, None)
-            show_action_menu(chat_id, db)
+        question = f"¿Aprobar agregar la URL: '{url_address}' al tag: '{url_tag}' con justificación: '{justification}'?"
+        options = ["✅ Sí", "❌ No"]
+        data = {
+            'url': url_address,
+            'tag': url_tag,
+            'justification': justification
+        }
+        launch_approval_survey(chat_id, question, options, object_type="url", data=data)
 
+
+def save_url(chat_id, data):
+    """
+    function in charge of storing the url in the database
+
+    Inputs:
+    -------
+    chat_id: int
+        ID of the chat
+    data: dict
+        Data of the tag to save
+    """
+    try:
+        db = next(get_db())
+        tag = db.query(Tag).filter_by(name=data['tag'], community_id=chat_id).first()
+        community = db.query(Community).filter_by(id=chat_id).first()
+        new_url = Url(
+            url=data['url'],
+            justification=data['justification'],
+            community_id=community.id,
+            tag_id=tag.id
+        )
+        db.add(new_url)
+        db.commit()
+        bot.send_message(chat_id, f"✅ URL '{data['url']}' agregada exitosamente.")
+    except SQLAlchemyError as e:
+        bot.send_message(chat_id, f"❌ Error al guardar la URL: {e}")
 
 # ----- EDIT URL -----
 @bot.callback_query_handler(func=lambda call: call.data == "manage_urls")
@@ -502,18 +628,17 @@ def save_new_justification(message):
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
     else:
-        try:
-            # update url
-            db = next(get_db())
-            url_entry = db.query(Url).filter_by(id=url_id).first()
-            url_entry.justification = new_just
-            db.commit()
-            bot.send_message(chat_id, "Justificación actualizada correctamente.")
-        except SQLAlchemyError as e:
-            bot.send_message(chat_id, f"Error al actualizar: {e}")
-        finally:
-            user_states.pop(chat_id, None)
-            show_action_menu(chat_id, db)
+        # Launch approval survey before saving the new justification
+        db = next(get_db())
+        url_entry = db.query(Url).filter_by(id=url_id).first()
+        question = f"¿Aprobar la nueva justificación: '{new_just}' para la URL: '{url_entry.url}'?"
+        options = ["✅ Sí", "❌ No"]
+        data = {
+            'type': 'justification',
+            'url_id': url_id,
+            'new_value': new_just
+        }
+        launch_approval_survey(chat_id, question, options, object_type="edit_url", data=data)
 
 # change url's tag
 @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_tag_"))
@@ -537,16 +662,25 @@ def set_new_tag(call):
     url_id = int(parts[3])
     new_tag_id = int(parts[4])
     chat_id = call.message.chat.id
+
     db = next(get_db())
     url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
-    if url:
-        url.tag_id = new_tag_id
-        db.commit()
-        bot.edit_message_text(f"✅ Tag actualizado para la URL {url.url}.", chat_id, call.message.message_id)
+    new_tag = db.query(Tag).filter_by(id=new_tag_id).first()
+
+    if url and new_tag:
+        question = f"¿Aprobar el cambio de tag de la URL '{url.url}' a '{new_tag.name}'?"
+        options = ["✅ Sí", "❌ No"]
+        data = {
+            'type': 'tag',
+            'url_id': url_id,
+            'new_value': new_tag_id
+        }
+        launch_approval_survey(chat_id, question, options, object_type="edit_url", data=data)
     else:
-        bot.send_message(chat_id, "❌ No se encontró la URL.")
+        bot.send_message(chat_id, "❌ No se encontró la URL o el nuevo tag.")
+        db = next(get_db())
+        show_action_menu(chat_id, db)
     bot.answer_callback_query(call.id)
-    show_action_menu(chat_id, db)
 
 # ask confirmation for delete url
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_url_"))
