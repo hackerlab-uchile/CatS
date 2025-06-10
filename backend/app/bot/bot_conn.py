@@ -4,6 +4,7 @@ import os
 from app.database import get_db
 from app.models import Community, Tag, Url
 from app.bot.utils import is_valid_url, is_valid_name
+from collections import defaultdict
 from sqlalchemy.exc import SQLAlchemyError
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply, PollAnswer
 
@@ -24,6 +25,9 @@ TAGS_PER_PAGE = 3
 
 # Dictionary to save the state per chat
 user_states = {}
+
+# New dictionary to track anonymous votes
+anonymous_votes = defaultdict(lambda: {'yes': 0, 'no': 0, 'voters': set()})
 
 # ------------------------------------------------------------------------------------------------------------------
 
@@ -157,59 +161,62 @@ def handle_page_navigation(call):
     show_tag_buttons(chat_id, page=page)
 
 
-poll_results = {}  # poll_id -> [votes]
-
-def launch_approval_survey(chat_id, question, options, object_type, data):
-    """
-    Launches a survey and temporarily saves the related info to process the response.
-    """
-    message = bot.send_poll(
+# Launch anonymous vote using inline buttons
+def launch_anonymous_vote(chat_id, question, object_type, data):
+    message = bot.send_message(
         chat_id,
         question,
-        options,
-        is_anonymous=False,
-        allows_multiple_answers=False
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Sí", callback_data=f"vote_yes|{chat_id}"),
+            InlineKeyboardButton("❌ No", callback_data=f"vote_no|{chat_id}")
+        ]])
     )
-    poll_id = message.poll.id
     user_states[chat_id] = {
         'step': 'wait_approval',
-        'object_type': object_type,  # 'tag' o 'url'
+        'object_type': object_type,
         'data': data,
-        'poll_id': poll_id,
         'message_id': message.message_id
     }
-    poll_results[poll_id] = []
-    threading.Timer(60, check_survey_result, args=[chat_id]).start()
+    # Start vote check timer
+    threading.Timer(60, check_anonymous_vote_result, args=[chat_id]).start()
     bot.send_message(chat_id, "Se esperará 1 minuto para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
 
+# Handle votes
+@bot.callback_query_handler(func=lambda call: call.data.startswith("vote_"))
+def handle_vote_buttons(call):
+    action, chat_id = call.data.split("|")
+    chat_id = int(chat_id)
+    user_id = call.from_user.id
 
-# Function that receive the vote
-@bot.poll_answer_handler()
-def handle_poll_answer(poll_answer: PollAnswer):
-    poll_id = poll_answer.poll_id # unique id of the response
-    selected_option = poll_answer.option_ids[0] # index of the voted option (0 = "Sí", 1 = "No")
-    poll_results.setdefault(poll_id, []).append(selected_option) # add vote to the results register
-    print(f"Recibido voto en encuesta {poll_answer.poll_id}: opción {poll_answer.option_ids[0]}")
+    # Prevent double voting
+    if user_id in anonymous_votes[chat_id]['voters']:
+        bot.answer_callback_query(call.id, "Ya has votado.")
+        return
 
-def check_survey_result(chat_id):
-    """
-    Checks the result of the survey, if 60 percent of the answers are “yes” the appropriate function is called (save_url or save_tag),
-      on the other hand, if the answer is “no” it is cancelled. Finally, the action menu is called.
-    """
+    anonymous_votes[chat_id]['voters'].add(user_id)
+    if action == "vote_yes":
+        anonymous_votes[chat_id]['yes'] += 1
+    else:
+        anonymous_votes[chat_id]['no'] += 1
+
+    bot.answer_callback_query(call.id, "✅ Voto recibido.")
+
+# Check result
+
+def check_anonymous_vote_result(chat_id):
     state = user_states.get(chat_id, {})
-    poll_id = state.get('poll_id')
-    votes = poll_results.get(poll_id, [])
+    result = anonymous_votes.get(chat_id, {})
+    total_votes = result['yes'] + result['no']
 
-    if not votes:
+    if total_votes == 0:
         percentage = 0
     else:
-        approvals = votes.count(0)
-        percentage = approvals / len(votes)
+        percentage = result['yes'] / total_votes
 
-    if percentage >= 0.5:
+    if percentage >= 0.6:
         type = state.get('object_type')
         data = state.get('data')
-        if type== "tag":
+        if type == "tag":
             save_tag(chat_id, data)
         elif type == "url":
             save_url(chat_id, data)
@@ -219,7 +226,6 @@ def check_survey_result(chat_id):
             new_value = data.get("new_value")
             db = next(get_db())
             url_entry = db.query(Url).filter_by(id=url_id).first()
-
             if url_entry:
                 if edit_type == "justification":
                     url_entry.justification = new_value
@@ -231,11 +237,13 @@ def check_survey_result(chat_id):
                 bot.send_message(chat_id, "❌ No se encontró la URL para editar.")
     else:
         bot.send_message(chat_id, "❌ La propuesta fue rechazada por la comunidad.")
-    print(f"Votos registrados para poll {poll_id}: {votes}")
-    poll_results.pop(poll_id, None)
+
+    # Cleanup
+    anonymous_votes.pop(chat_id, None)
     user_states.pop(chat_id, None)
     db = next(get_db())
     show_action_menu(chat_id, db)
+
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -410,13 +418,12 @@ def handle_tag_action_selection(call):
 
     # Guardar info y lanzar encuesta
     question = f"¿Aprobar el nuevo tag: '{tag_name}' con acción: '{action}' y descripción: '{tag_description}'?"
-    options = ["✅ Sí", "❌ No"]
     data = {
         'tag_name': tag_name,
         'tag_description': tag_description,
         'action': action
     }
-    launch_approval_survey(chat_id, question, options, object_type="tag", data=data)
+    launch_anonymous_vote(chat_id, question, object_type="tag", data=data)
 
 
 def save_tag(chat_id, data):
@@ -523,13 +530,12 @@ def handle_fill_url_justification(message):
         user_states[chat_id] = {'step': 'fill_url_justification', 'url': url_address, 'tag': url_tag}
     else:
         question = f"¿Aprobar agregar la URL: '{url_address}' al tag: '{url_tag}' con justificación: '{justification}'?"
-        options = ["✅ Sí", "❌ No"]
         data = {
             'url': url_address,
             'tag': url_tag,
             'justification': justification
         }
-        launch_approval_survey(chat_id, question, options, object_type="url", data=data)
+        launch_anonymous_vote(chat_id, question, object_type="url", data=data)
 
 
 def save_url(chat_id, data):
@@ -632,13 +638,12 @@ def save_new_justification(message):
         db = next(get_db())
         url_entry = db.query(Url).filter_by(id=url_id).first()
         question = f"¿Aprobar la nueva justificación: '{new_just}' para la URL: '{url_entry.url}'?"
-        options = ["✅ Sí", "❌ No"]
         data = {
             'type': 'justification',
             'url_id': url_id,
             'new_value': new_just
         }
-        launch_approval_survey(chat_id, question, options, object_type="edit_url", data=data)
+        launch_anonymous_vote(chat_id, question, object_type="edit_url", data=data)
 
 # change url's tag
 @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_tag_"))
@@ -669,13 +674,12 @@ def set_new_tag(call):
 
     if url and new_tag:
         question = f"¿Aprobar el cambio de tag de la URL '{url.url}' a '{new_tag.name}'?"
-        options = ["✅ Sí", "❌ No"]
         data = {
             'type': 'tag',
             'url_id': url_id,
             'new_value': new_tag_id
         }
-        launch_approval_survey(chat_id, question, options, object_type="edit_url", data=data)
+        launch_anonymous_vote(chat_id, question, object_type="edit_url", data=data)
     else:
         bot.send_message(chat_id, "❌ No se encontró la URL o el nuevo tag.")
         db = next(get_db())
