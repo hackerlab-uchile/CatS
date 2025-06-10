@@ -43,6 +43,7 @@ def instrucciones_text():
         "------------------------------------------------------\n\n"
 
         "Aquí hay algunas instrucciones para usar el bot:\n\n"
+
         "⭐ Envía *\start* y el bot te guiará en la creación de tu comunidad!\n\n"
 
         "Descripción de las acciones existentes:\n\n"
@@ -163,6 +164,18 @@ def handle_page_navigation(call):
 
 # Launch anonymous vote using inline buttons
 def launch_anonymous_vote(chat_id, question, object_type, data):
+    """
+    Launches anonymous voting with buttons and stores expected quorum.
+    """
+    try:
+        total_members = bot.get_chat_members_count(chat_id)
+    except Exception as e:
+        bot.send_message(chat_id, "❌ No se pudo obtener el número de integrantes del grupo, para asegurar el funcionamiento de la encuesta, promueve al bot a administrador de chat")
+        total_members = 1  # fallback to avoid division by zero
+
+    quorum = max(1, int((total_members - 1) * 0.5) +1)  # at least 50%
+
+    full_question = question + "\n ⚠️ No podrás cambiar tu selección luego de votar ⚠️"
     message = bot.send_message(
         chat_id,
         question,
@@ -175,7 +188,8 @@ def launch_anonymous_vote(chat_id, question, object_type, data):
         'step': 'wait_approval',
         'object_type': object_type,
         'data': data,
-        'message_id': message.message_id
+        'message_id': message.message_id,
+        'quorum': quorum
     }
     # Start vote check timer
     threading.Timer(60, check_anonymous_vote_result, args=[chat_id]).start()
@@ -207,13 +221,14 @@ def check_anonymous_vote_result(chat_id):
     state = user_states.get(chat_id, {})
     result = anonymous_votes.get(chat_id, {})
     total_votes = result['yes'] + result['no']
+    quorum = state.get('quorum', 1)
 
     if total_votes == 0:
         percentage = 0
     else:
         percentage = result['yes'] / total_votes
 
-    if percentage >= 0.6:
+    if  total_votes >= quorum and percentage >= 0.6:
         type = state.get('object_type')
         data = state.get('data')
         if type == "tag":
@@ -236,7 +251,7 @@ def check_anonymous_vote_result(chat_id):
             else:
                 bot.send_message(chat_id, "❌ No se encontró la URL para editar.")
     else:
-        bot.send_message(chat_id, "❌ La propuesta fue rechazada por la comunidad.")
+        bot.send_message(chat_id, f"❌ La propuesta fue rechazada por la comunidad o no se cumplió quórum mínimo: {quorum}, votos recibidos: {total_votes}.")
 
     # Cleanup
     anonymous_votes.pop(chat_id, None)
