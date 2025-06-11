@@ -6,6 +6,8 @@ const tagDescription = document.getElementById("tagDescription");
 const statusMessage = document.getElementById("statusMessage");
 
 let communities = []; // Save to access the name
+const subscriptionsList = document.getElementById("subscriptionsList");
+let subsVisible = false;
 
 // Load communities and populate select
 async function loadCommunities() {
@@ -100,6 +102,89 @@ document.getElementById("loadBtn").addEventListener("click", async () => {
         setTimeout(() => {
             statusMessage.textContent = "";
         }, 5000);
+    });
+});
+
+
+// reset buttom
+document.getElementById("resetBtn").addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "resetEverything" }, (response) => {
+        if (response.status === "success") {
+            statusMessage.style.color = "green";
+            statusMessage.textContent = "✅ Se eliminaron URLs y reglas.";
+        } else {
+            statusMessage.style.color = "red";
+            statusMessage.textContent = "❌ Error al resetear.";
+        }
+        setTimeout(() => {
+            statusMessage.textContent = "";
+        }, 5000);
+    });
+});
+
+// view subscriptions communities
+document.getElementById("subscriptionsBtn").addEventListener("click", () => {
+    if (subsVisible) {
+        // Ocultar si ya está visible
+        subscriptionsList.innerHTML = "";
+        subsVisible = false;
+        return;
+    }
+
+    chrome.runtime.sendMessage({ type: "getSubscriptions" }, (response) => {
+        subscriptionsList.innerHTML = "";
+
+        if (!response || !Array.isArray(response.urls) || response.urls.length === 0) {
+            subscriptionsList.style.color = "gray";
+            subscriptionsList.textContent = "📭 No hay suscripciones activas.";
+        } else {
+            const uniqueSubs = new Map();
+            for (const entry of response.urls) {
+                const key = `${entry.community_id}-${entry.tag_id}`;
+                if (!uniqueSubs.has(key)) {
+                    uniqueSubs.set(key, {
+                        community_id: entry.community_id,
+                        community_name: entry.community_name,
+                        tag_id: entry.tag_id,
+                        tag_name: entry.tag_name
+                    });
+                }
+            }
+
+            for (const [key, data] of uniqueSubs.entries()) {
+                const container = document.createElement("div");
+                container.style.marginTop = "8px";
+
+                const label = document.createElement("span");
+                label.textContent = `• ${data.community_name} → ${data.tag_name}`;
+                label.style.marginRight = "6px";
+
+                const btn = document.createElement("button");
+                btn.textContent = "Desubscribir";
+                btn.style.fontSize = "11px";
+                btn.style.padding = "2px 6px";
+                btn.addEventListener("click", () => {
+                    chrome.runtime.sendMessage({
+                        type: "unsubscribe",
+                        community_id: data.community_id,
+                        tag_id: data.tag_id
+                    }, (res) => {
+                        if (res.status === "success") {
+                            label.textContent = "🗑️ Desuscrito";
+                            btn.remove();
+                        } else {
+                            alert("Error al desubscribir.");
+                        }
+                    });
+                });
+
+                container.appendChild(label);
+                container.appendChild(btn);
+                subscriptionsList.appendChild(container);
+            }
+        }
+
+        subsVisible = true;
     });
 });
 

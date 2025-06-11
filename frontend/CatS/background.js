@@ -30,6 +30,9 @@ function openDatabase() {
         objectStore.createIndex("community_id", "community_id", { unique: false });
         objectStore.createIndex("action", "action", { unique: false });
         objectStore.createIndex("justification", "justification", { unique: false });
+        objectStore.createIndex("community_name", "community_name", { unique: false });
+        objectStore.createIndex("tag_name", "tag_name", { unique: false });
+
         }
       };
       request.onsuccess = (event) => resolve(event.target.result);
@@ -38,12 +41,20 @@ function openDatabase() {
 }
 
 // Add url to indexedDB
-async function addURL(url, tag_id, community_id, action, justification) {
+async function addURL(url, tag_id, community_id, action, justification, community_name, tag_name) {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.put({ url, tag_id, community_id, action, justification });
+        const request = store.put({
+            url,
+            tag_id,
+            community_id,
+            action,
+            justification,
+            community_name,
+            tag_name
+        });
         request.onsuccess = () => {
             console.log(`Agregado: ${url}`);
             resolve();
@@ -66,7 +77,9 @@ async function fetchAndStoreURLs(communityId, tagId, communityName, tagName) {
                 tagId,
                 communityId,
                 urlObj.action,
-                urlObj.justification
+                urlObj.justification,
+                communityName,
+                tagName
             );
         }
 
@@ -114,7 +127,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.notifications.create({
             type: "basic",
             iconUrl: "icons/border-48.png", // CHANGE --------------------------------------!!!!!
-            title: "Advertencia",
+            title: "CatS",
             message: message.message
         });
     }
@@ -157,4 +170,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+});
+
+// Clear indexedDB 
+async function clearIndexedDB() {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_NAME, "readwrite");
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = () => resolve();
+        clearRequest.onerror = () => reject(clearRequest.error);
+    });
+}
+
+// Clear dinamic rules
+async function removeAllDynamicRules() {
+    return new Promise((resolve) => {
+        chrome.declarativeNetRequest.getDynamicRules((rules) => {
+            const ids = rules.map(rule => rule.id);
+            if (ids.length > 0) {
+                chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids }, resolve);
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+
+
+// Listen to new commands from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "resetEverything") {
+        Promise.all([clearIndexedDB(), removeAllDynamicRules()])
+            .then(() => sendResponse({ status: "success" }))
+            .catch((err) => {
+                console.error("Error al resetear:", err);
+                sendResponse({ status: "error" });
+            });
+        return true;
+    }
+
+    if (message.type === "getSubscriptions") {
+        getAllURLs()
+            .then(urls => sendResponse({ status: "success", urls }))
+            .catch(() => sendResponse({ status: "error" }));
+        return true;
+    }
+
+    if (message.type === "unsubscribe") {
+        const { community_id, tag_id } = message;
+
+        openDatabase().then(db => {
+            const transaction = db.transaction(STORE_NAME, "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const allItems = request.result;
+                const filtered = allItems.filter(item =>
+                    item.community_id == community_id && item.tag_id == tag_id
+                );
+
+                for (const item of filtered) {
+                    store.delete(item.url);
+                }
+
+                transaction.oncomplete = () => {
+                    sendResponse({ status: "success" });
+                };
+
+                transaction.onerror = () => {
+                    sendResponse({ status: "error" });
+                };
+            };
+
+            request.onerror = () => {
+                sendResponse({ status: "error" });
+            };
+        });
+
+        return true; // Keep message channel open
+    }
 });

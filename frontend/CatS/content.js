@@ -18,21 +18,22 @@ chrome.runtime.sendMessage({ type: "getFilteredURLs" }, (response) => {
 
           const action = entry.action;
           const justification = entry.justification;
+          const contextPrefix = `Comunidad ${entry.community_name} (ID: ${entry.community_id}, Tag: ${entry.tag_name}): `;
 
           if (action === "alert") {
-              alert(justification);
+              alert(contextPrefix + justification);
           }
           if (action === "notify") {
             chrome.runtime.sendMessage({
               type: "notify",
-              message: `${justification}`
+              message: contextPrefix + justification
             });
           }
           if (action === "block") {
             chrome.runtime.sendMessage({
               type: "block",
               url: entry.url,
-              justification: justification
+              justification: contextPrefix + justification
             });
           }
         }
