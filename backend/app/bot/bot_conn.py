@@ -414,7 +414,7 @@ def handle_fill_tag_description(message):
         markup.add(
             InlineKeyboardButton("🔒 Block", callback_data="tag_action_block"),
             InlineKeyboardButton("⚠️ Alert", callback_data="tag_action_alert"),
-            InlineKeyboardButton("🔔 Notification", callback_data="tag_action_notification")
+            InlineKeyboardButton("🔔 Notify", callback_data="tag_action_notify")
         )
         bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
         user_states[chat_id] = {'step': 'tag_action_', 'tag_name':tag_name, 'tag_description': tag_description}
