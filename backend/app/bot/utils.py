@@ -38,6 +38,6 @@ def is_valid_name(name: str, max_length: int) -> bool:
         return False
 
     # Only letters, numbers, spaces, - and _
-    if not re.match(r"^[\w\s\-]+$", name, re.UNICODE):
+    if not re.match(r"^[\w\s\-,]+$", name, re.UNICODE):
         return False
     return True

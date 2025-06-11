@@ -19,6 +19,7 @@ IPSERVER = os.getenv("SERVER_IP")
 # Length name fields
 LENNAMES = int(os.getenv("LENNAMES"))
 LENDESC = int(os.getenv("LENDESC"))
+SURVEY_WAITIG_TIME = int(os.getenv("SURVEY_WAITIG_TIME"))
 
 # Function that page existing tags
 TAGS_PER_PAGE = 3
@@ -192,8 +193,8 @@ def launch_anonymous_vote(chat_id, question, object_type, data):
         'quorum': quorum
     }
     # Start vote check timer
-    threading.Timer(60, check_anonymous_vote_result, args=[chat_id]).start()
-    bot.send_message(chat_id, "Se esperará 1 minuto para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
+    threading.Timer(SURVEY_WAITIG_TIME, check_anonymous_vote_result, args=[chat_id]).start()
+    bot.send_message(chat_id, f"Se esperará {SURVEY_WAITIG_TIME} segundos para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
 
 # Handle votes
 @bot.callback_query_handler(func=lambda call: call.data.startswith("vote_"))
@@ -334,7 +335,7 @@ def handle_description(message):
 
     # description sanitization
     if not is_valid_name(description, LENDESC):
-        bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENDESC} carácteres.")
         bot.send_message(chat_id, "Ingresa una descripción para la comunidad:", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'ask_description', 'name': name}
     else:
@@ -406,7 +407,7 @@ def handle_fill_tag_description(message):
 
     # description sanitization
     if not is_valid_name(tag_description, LENDESC):
-        bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, f"⚠️ Descripción inválida, ingresa una descripción válida y de máximo {LENDESC} carácteres.")
         bot.send_message(chat_id, "Ingresa una descripción para el Tag:")
         user_states[chat_id] = {'step': 'fill_tag_description', 'tag_name':tag_name}
     else:
@@ -540,7 +541,7 @@ def handle_fill_url_justification(message):
 
     # justification sanitization
     if not is_valid_name(justification, LENDESC):
-        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENDESC} carácteres.")
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'fill_url_justification', 'url': url_address, 'tag': url_tag}
     else:
@@ -645,7 +646,7 @@ def save_new_justification(message):
 
     # new justification sanitization
     if not is_valid_name(new_just, LENDESC):
-        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENNAMES} carácteres.")
+        bot.send_message(chat_id, f"⚠️ Justificación inválida, ingresa una justificación válida y de máximo {LENDESC} carácteres.")
         bot.send_message(chat_id, "Ingresa una justificación para la URL:")
         user_states[chat_id] = {'step': 'editing_just', 'url_id': url_id}
     else:
