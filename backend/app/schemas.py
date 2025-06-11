@@ -49,6 +49,17 @@ class Community(CommunityBase):
     class Config:
         from_attributes = True
 
+# Para retornar URLs con su acción asociada al tag
+class UrlWithAction(BaseModel):
+    url: str
+    justification: str
+    tag_id: int
+    community_id: int
+    action: str
+
+    class Config:
+        from_attributes = True
+
 class RevisionBase(BaseModel):
     anonymous_user: str
     justification: Optional[str]

@@ -6,7 +6,7 @@ from typing import List
 from app.database import get_db
 from app.models import Community, Tag, Url
 from app import schemas
-
+from app.schemas import UrlWithAction
 router = APIRouter()
 
 # Router for get communities
@@ -23,7 +23,7 @@ def get_tags_by_community(community_id: int, db: Session = Depends(get_db)):
     return tags
 
 # Router for get urls from a specific tag of a specific community
-@router.get("/communities/{community_id}/{tag_id}/urls", response_model=List[schemas.Url])
+@router.get("/communities/{community_id}/{tag_id}/urls", response_model=List[UrlWithAction])
 def get_urls_by_tag(community_id: int, tag_id: int, db: Session = Depends(get_db)):
     urls = db.query(Url).filter(
         Url.community_id == community_id,
@@ -31,4 +31,18 @@ def get_urls_by_tag(community_id: int, tag_id: int, db: Session = Depends(get_db
     ).all()
     if not urls:
         raise HTTPException(status_code=404, detail="No se encontraron urls")
-    return urls
+    
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    return [
+        UrlWithAction(
+            url=u.url,
+            justification=u.justification,
+            tag_id=u.tag_id,
+            community_id=u.community_id,
+            action=tag.action
+        )
+        for u in urls
+    ]
