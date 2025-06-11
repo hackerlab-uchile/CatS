@@ -1,10 +1,23 @@
 from app import init_db
+from app.api import router as api_router # without
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from multiprocessing import Process
 import argparse
 import subprocess
 
 app = FastAPI() # instance of FastAPI
+
+# Applies CORS middleware to the main app to allow HTTP requests from different domains
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router)
 
 app.title = "CatS"
 app.version = "1.2.0"
@@ -22,6 +35,9 @@ def run_bot():
     subprocess.run(["python", "-u", "-m", "app.bot.bot_conn"])
 
 def run_both_services():
+    """
+    function that execute two services, run_bot and run_backend
+    """
     p1 = Process(target=run_backend)
     p2 = Process(target=run_bot)
     p1.start()
