@@ -43,7 +43,7 @@ class Url(Base):
     __tablename__ = "url"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    url = Column(String, nullable=False, unique=True)
+    url = Column(String, nullable=False, unique=False)
     justification = Column(Text, nullable=False)
     community_id = Column(BigInteger, ForeignKey("community.id", ondelete="CASCADE"))
     tag_id = Column(Integer, ForeignKey("tag.id", ondelete="CASCADE"))
