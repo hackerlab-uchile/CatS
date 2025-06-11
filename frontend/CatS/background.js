@@ -1,8 +1,21 @@
-const DB_NAME = "FilteredURLsDB";
+const API_BASE = "http://localhost:8000";
+const DB_NAME = "CatS_local_DB";
 const DB_VERSION = 1;
-const STORE_NAME = "urls";
+const STORE_NAME = "urls_storage";
 
-// Abrir (o crear) la base de datos "urlDatabase" con un objectStore "urlList"
+// Clean up dynamic rules on install or update
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.declarativeNetRequest.getDynamicRules((rules) => {
+    const ids = rules.map(rule => rule.id);
+    if (ids.length > 0) {
+      chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids }, () => {
+        console.log("🧼 Dynamic rules cleaned on install/update:", ids);
+      });
+    }
+  });
+});
+
+// Open (or create) database 
 function openDatabase() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -11,38 +24,26 @@ function openDatabase() {
         const db = event.target.result;
 
         if (!db.objectStoreNames.contains(STORE_NAME)) {
-        // Crea el objectStore con la clave 'url' y añade índices para 'tag', 'comunidad' y 'accion'
+        // Create the objectStore with the key 'url' and add index for 'tag_id', 'community_id', 'action' and 'justification'
         const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "url" });
-        objectStore.createIndex("tag", "tag", { unique: false });
-        objectStore.createIndex("community", "community", { unique: false });
+        objectStore.createIndex("tag_id", "tag_id", { unique: false });
+        objectStore.createIndex("community_id", "community_id", { unique: false });
         objectStore.createIndex("action", "action", { unique: false });
+        objectStore.createIndex("justification", "justification", { unique: false });
         }
       };
       request.onsuccess = (event) => resolve(event.target.result);
       request.onerror = (event) => reject(event.target.error);
     });
 }
-  
-// Ejemplo de función para obtener todas las URL que deben notificar
-async function getUrlsByAction(actionType) {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, "readonly");
-        const store = transaction.objectStore(STORE_NAME);
-        const index = store.index("action");
-        const request = index.getAll(actionType);
-        
-        request.onsuccess = (event) => resolve(event.target.result);
-        request.onerror = (event) => reject(event.target.error);
-    });
-}
 
-async function addURL(url, tag, community, action) {
+// Add url to indexedDB
+async function addURL(url, tag_id, community_id, action, justification) {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.put({ url, tag, community, action });
+        const request = store.put({ url, tag_id, community_id, action, justification });
         request.onsuccess = () => {
             console.log(`Agregado: ${url}`);
             resolve();
@@ -51,8 +52,33 @@ async function addURL(url, tag, community, action) {
     });
 }
 
+// Store all url list to indexedDB
+async function fetchAndStoreURLs(communityId, tagId, communityName, tagName) {
+    try {
+        const response = await fetch(`${API_BASE}/communities/${communityId}/${tagId}/urls`);
+        if (!response.ok) throw new Error("No se pudieron obtener las URLs");
 
-// Obtener todas las URLs de IndexedDB
+        const urls = await response.json();
+
+        for (const urlObj of urls) {
+            await addURL(
+                urlObj.url,
+                tagId,
+                communityId,
+                urlObj.action,
+                urlObj.justification
+            );
+        }
+
+        console.log(`Se guardaron ${urls.length} URLs de la comunidad: ${communityName}, con tag: ${tagName}`);
+    } catch (error) {
+        console.error("Error al obtener y guardar URLs:", error);
+    }
+}
+
+// ---------------------------------------- To execute actions -----------------------------------
+
+// Get all URLs from IndexedDB
 async function getAllURLs() {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
@@ -64,57 +90,50 @@ async function getAllURLs() {
         request.onerror = () => reject(request.error);
     });
 }
-  
-// Permitir que content.js consulte la base de datos
+
+// Create an determinist id for the dinamic rules based on the url
+function generateRuleIdFromUrl(url) {
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) {
+        hash = (hash << 5) - hash + url.charCodeAt(i);
+        hash |= 0; // Converts to 32-bit int
+    }
+    return Math.abs(hash);
+}
+
+
+// Allow content.js to query the database
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "getFilteredURLs") {
         getAllURLs()
             .then(data => sendResponse({ urls: data }))
             .catch(error => sendResponse({ error }));
-        return true; // Indica respuesta asincrónica
-    }
-    if (message.type === "block") {
-        const urlToBlock = message.url;
-
-        chrome.declarativeNetRequest.updateDynamicRules({
-            addRules: [{
-                id: Math.floor(Math.random() * 100000), // Un ID único ----- ARREGLAR
-                priority: 1,
-                action: { type: "block" },
-                condition: {
-                    urlFilter: urlToBlock,
-                    resourceTypes: ["main_frame"]
-                }
-            }],
-        }, () => {
-            sendResponse({ status: "blocked" });
-            
-        });
-
-        // Importante: mantener esto para respuestas asíncronas
-        return true;
+        return true; // indicate async response
     }
     if (message.type === "notify") {
         chrome.notifications.create({
             type: "basic",
-            iconUrl: "icons/border-48.png", // debe ser un ícono de tu extensión, o usa uno pequeño (48x48 px)
+            iconUrl: "icons/border-48.png", // CHANGE --------------------------------------!!!!!
             title: "Advertencia",
             message: message.message
         });
     }
-    if (message.type === "blockAndNotify") {
+    if (message.type === "block") {
         const urlToBlock = message.url;
-        const host = message.host;
+        const justification = message.justification;
     
         chrome.notifications.create({
             type: "basic",
             iconUrl: "icons/border-48.png",
-            title: "Advertencia",
-            message: `Se ha bloqueado el acceso a ${host}`
-        }, () => {
+            title: "Sitio Bloqueado",
+            message: `${justification}`
+        });
+
+        // delay before locking
+        setTimeout(() => {
             chrome.declarativeNetRequest.updateDynamicRules({
                 addRules: [{
-                    id: Math.floor(Math.random() * 100000),
+                    id: generateRuleIdFromUrl(urlToBlock),
                     priority: 1,
                     action: { type: "block" },
                     condition: {
@@ -123,12 +142,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
                 }],
             });
-        });
+        }, 200); // 200ms, ajustable
     
         return true;
     }    
+    if (message.type === "fetchAndStoreURLs") {
+        const { communityId, tagId, communityName, tagName } = message;
+        fetchAndStoreURLs(communityId, tagId, communityName, tagName)
+            .then(() => sendResponse({ status: "success" }))
+            .catch((error) => {
+                console.error("Error en fetchAndStoreURLs desde popup:", error);
+                sendResponse({ status: "error", error: error.message });
+            });
+        return true;
+    }
+
 });
-
-
-
-self.addURL = addURL;

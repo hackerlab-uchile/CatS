@@ -1,25 +1,44 @@
-chrome.runtime.sendMessage({ type: "getFilteredURLs" }, response => {
-    if (response && response.urls) {
-        const currentHostname = window.location.hostname;
-        response.urls.forEach(({ url, action }) => {
-            let storedHostname = new URL(url).hostname;
-            if (currentHostname.endsWith(storedHostname)) {
-                if (action === "alert") {
-                    alert("Página de contenido sensible. Proceda con precaución.");
-                } else if (action === "notify") {
-                    chrome.runtime.sendMessage({ type: "notify", message: `Estás visitando ${currentHostname}` });
-                } else if (action === "block") {                   
-                    chrome.runtime.sendMessage({ type: "block", url})               
-                } else if(action === "blockAndNotify"){
-                    chrome.runtime.sendMessage({
-                        type: "blockAndNotify",
-                        url: url,
-                        host: window.location.hostname
-                    });
-                    
-                }
-            }
-        });
-    }
-});
+chrome.runtime.sendMessage({ type: "getFilteredURLs" }, (response) => {
+  if (response?.urls) {
+    const currentUrl = new URL(window.location.href);
+    console.log("URLs cargadas en content.js:", response.urls);
 
+    for (const entry of response.urls) {
+      let entryUrl;
+      try {
+        entryUrl = new URL(entry.url);
+      } catch (err) {
+        console.warn("URL malformada:", entry.url);
+        continue;
+      }
+
+      if (currentUrl.hostname === entryUrl.hostname) {
+        if (!entryUrl.pathname || currentUrl.pathname.startsWith(entryUrl.pathname)) {
+          console.log("Match encontrado:", entry.url);
+
+          const action = entry.action;
+          const justification = entry.justification;
+
+          if (action === "alert") {
+              alert(justification);
+          }
+          if (action === "notify") {
+            chrome.runtime.sendMessage({
+              type: "notify",
+              message: `${justification}`
+            });
+          }
+          if (action === "block") {
+            chrome.runtime.sendMessage({
+              type: "block",
+              url: entry.url,
+              justification: justification
+            });
+          }
+        }
+      }
+    }
+  } else {
+    console.error("No se pudieron obtener las URLs desde background.js");
+  }
+});
