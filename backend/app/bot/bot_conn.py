@@ -215,11 +215,18 @@ def handle_vote_buttons(call):
         anonymous_votes[chat_id]['no'] += 1
 
     bot.answer_callback_query(call.id, "✅ Voto recibido.")
+    total_votes = len(anonymous_votes[chat_id]['voters'])
+    total_members = bot.get_chat_members_count(chat_id)
+    if total_votes == (total_members -1):
+        check_anonymous_vote_result(chat_id)
 
 # Check result
 
 def check_anonymous_vote_result(chat_id):
     state = user_states.get(chat_id, {})
+
+
+
     result = anonymous_votes.get(chat_id, {})
     total_votes = result['yes'] + result['no']
     quorum = state.get('quorum', 1)
@@ -255,6 +262,10 @@ def check_anonymous_vote_result(chat_id):
         bot.send_message(chat_id, f"❌ La propuesta fue rechazada por la comunidad o no se cumplió quórum mínimo: {quorum}, votos recibidos: {total_votes}.")
 
     # Cleanup
+                   
+    message_id = state.get('message_id')
+    bot.delete_message(chat_id, message_id)  # Delete msg with the survey
+        
     anonymous_votes.pop(chat_id, None)
     user_states.pop(chat_id, None)
     db = next(get_db())
