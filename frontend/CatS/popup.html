@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="es">
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/light.css">
+
 <head>
   <meta charset="UTF-8">
   <title>CatS Extension</title>
   <style>
-    body { font-family: Arial; padding: 10px; width: 250px; }
-    select, button { width: 100%; margin-top: 10px; }
+    body { font-family: "Gill Sans Extrabold", sans-serif; padding: 30px; width: 280px; }
+    select, button { width: 100%; margin-top: 5px; }
   </style>
 </head>
 
 <body>
-  <h3>Seleccionar Comunidad y Tag</h3>
+  <h2>Seleccionar Comunidad y Tag</h2>
 
   <label for="communitySelect">Comunidad:</label>
   <select id="communitySelect"></select>
@@ -21,7 +23,7 @@
   <select id="tagSelect"></select>
   <p id="tagDescription" class="description"></p>
   
-  <button id="loadBtn">Subscribirse</button>
+  <button id="loadBtn" style="background-color: #191D32; color: white;">Subscribirse</button>
 
   <p id="statusMessage" style="margin-top: 10px; color: green;"></p>
 
@@ -30,8 +32,8 @@
   <hr>
 
   <h4>Herramientas de navegación</h4>
-  <button id="subscriptionsBtn">Mis suscripciones</button>
-  <button id="resetBtn" style="margin-top: 10px;">Resetear todo</button>
+  <button id="subscriptionsBtn" style="background-color: #282F44; color: white;">Mis suscripciones</button>
+  <button id="resetBtn" style="background-color: #840032; color: white;">Resetear todo</button>
 
   <div id="subscriptionsList" style="margin-top: 10px; font-size: 14px; white-space: pre-wrap;"></div>
 

@@ -9,7 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
     const ids = rules.map(rule => rule.id);
     if (ids.length > 0) {
       chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids }, () => {
-        console.log("🧼 Dynamic rules cleaned on install/update:", ids);
+        console.log("Dynamic rules cleaned on install/update:", ids);
       });
     }
   });
@@ -25,7 +25,8 @@ function openDatabase() {
 
         if (!db.objectStoreNames.contains(STORE_NAME)) {
         // Create the objectStore with the key 'url' and add index for 'tag_id', 'community_id', 'action' and 'justification'
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "url" });
+        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "url_tag" });
+        objectStore.createIndex("url", "url", { unique: false });
         objectStore.createIndex("tag_id", "tag_id", { unique: false });
         objectStore.createIndex("community_id", "community_id", { unique: false });
         objectStore.createIndex("action", "action", { unique: false });
@@ -46,7 +47,9 @@ async function addURL(url, tag_id, community_id, action, justification, communit
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
+        const url_tag = `${url}|${tag_id}`;
         const request = store.put({
+            url_tag,
             url,
             tag_id,
             community_id,
@@ -229,28 +232,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             request.onsuccess = () => {
                 const allItems = request.result;
-                const filtered = allItems.filter(item =>
+                const toDelete = allItems.filter(item =>
                     item.community_id == community_id && item.tag_id == tag_id
                 );
 
-                for (const item of filtered) {
-                    store.delete(item.url);
+                const ruleIdsToRemove = toDelete.map(item => generateRuleIdFromUrl(item.url));
+
+                for (const item of toDelete) {
+                    store.delete(item.url_tag);
                 }
 
-                transaction.oncomplete = () => {
+                chrome.declarativeNetRequest.updateDynamicRules({
+                    removeRuleIds: ruleIdsToRemove
+                }, () => {
+                    console.log("Reglas eliminadas:", ruleIdsToRemove);
                     sendResponse({ status: "success" });
-                };
-
-                transaction.onerror = () => {
-                    sendResponse({ status: "error" });
-                };
+                });
             };
 
             request.onerror = () => {
                 sendResponse({ status: "error" });
             };
         });
-
         return true; // Keep message channel open
     }
 });

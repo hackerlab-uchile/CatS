@@ -18,7 +18,7 @@ async function loadCommunities() {
     for (const community of communities) {
         const option = document.createElement("option");
         option.value = community.id;
-        option.textContent = `${community.name} (ID: ${community.id})`;
+        option.textContent = `${community.name}`;
         communitySelect.appendChild(option);
     }
 
@@ -106,12 +106,17 @@ document.getElementById("loadBtn").addEventListener("click", async () => {
 });
 
 
-// reset buttom
+// reset button with confirmation
 document.getElementById("resetBtn").addEventListener("click", () => {
+    const confirmed = confirm("¿Estás segurx que deseas eliminar todas tus subscripciones y tags subscritos?");
+    if (!confirmed) return;
+
     chrome.runtime.sendMessage({ type: "resetEverything" }, (response) => {
         if (response.status === "success") {
             statusMessage.style.color = "green";
-            statusMessage.textContent = "✅ Se eliminaron URLs y reglas.";
+            statusMessage.textContent = "🧹 Se eliminaron URLs y reglas.";
+            subscriptionsList.innerHTML = "";
+            subsVisible = false;
         } else {
             statusMessage.style.color = "red";
             statusMessage.textContent = "❌ Error al resetear.";
@@ -121,6 +126,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
         }, 5000);
     });
 });
+
 
 // view subscriptions communities
 document.getElementById("subscriptionsBtn").addEventListener("click", () => {
@@ -136,7 +142,7 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
 
         if (!response || !Array.isArray(response.urls) || response.urls.length === 0) {
             subscriptionsList.style.color = "gray";
-            subscriptionsList.textContent = "📭 No hay suscripciones activas.";
+            subscriptionsList.textContent = "No hay suscripciones activas.";
         } else {
             const uniqueSubs = new Map();
             for (const entry of response.urls) {
@@ -163,6 +169,8 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                 btn.textContent = "Desubscribir";
                 btn.style.fontSize = "11px";
                 btn.style.padding = "2px 6px";
+                btn.style.backgroundColor = "#6D3B47"
+                btn.style.color = "white"
                 btn.addEventListener("click", () => {
                     chrome.runtime.sendMessage({
                         type: "unsubscribe",
@@ -170,7 +178,7 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                         tag_id: data.tag_id
                     }, (res) => {
                         if (res.status === "success") {
-                            label.textContent = "🗑️ Desuscrito";
+                            label.textContent = "🧹 Desuscrito";
                             btn.remove();
                         } else {
                             alert("Error al desubscribir.");
