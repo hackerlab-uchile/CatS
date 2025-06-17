@@ -45,7 +45,7 @@ def instrucciones_text():
 
         "Aquí hay algunas instrucciones para usar el bot:\n\n"
 
-        "⭐ Envía *\start* y el bot te guiará en la creación de tu comunidad!\n\n"
+        "⭐ Envía */start* y el bot te guiará en la creación de tu comunidad!\n\n"
 
         "Descripción de las acciones existentes:\n\n"
         
@@ -56,11 +56,70 @@ def instrucciones_text():
         "🧹 *Eliminar tag:* Permite eliminar un tag dentro de la lista de tags creados. ⚠️¡Esto eliminará todas las URLs asociadas exclusivamente a ese tag!⚠️\n"
         "🧹 *Eliminar Comunidad:* Permite eliminar la comunidad asociada al chat. ⚠️¡Esto eliminará todos los tags y URLs creados en este chat!⚠️\n\n"
 
-        "<<Para responder a la petición de nombres, descripciones y justificaciones, debes enviar tu mensaje *respondiendo* el mensaje del bot>>"
+        "❗❗Para que poder procesar bien tu respuesta, debes responder directamente al mensaje del bot❗❗\n"
+        "👉 Para hacerlo:\n"
+        "1. Mantén presionado (o haz clic derecho) en el mensaje del bot que te pidió algo.\n"
+        '2. Elige la opción "Responder".\n'
+        "3. Escribe tu mensaje (nombre, descripción o justificación) y envíalo.\n\n"
 
-        "⚙️ Usa el botón de menú (Invócalo con */start*) para ver las acciones disponibles.\n"
+        "❌ Si deseas cancelar la creación de un tag o url en algún paso intermedio, solo envía /start para mostrar el menú de acciones disponibles\n\n"
+
+        "⚙️ Usa */start* para ver las acciones disponibles.\n"
         "ℹ️ Ante dudas, envía */help* para volver a ver estas instrucciones."
     )
+
+
+@bot.message_handler(commands=["comunidades"])
+def explain_communities(message):
+    """
+    Function that returns the explanation of what is a community
+    """
+    explanation = (
+        "🏘️ *¿Qué son las comunidades?*\n\n"
+        "Una comunidad es un grupo de personas que comparten intereses similares, y que colaboran en la categorización y control de URLs en CatS.\n\n"
+        "Cada comunidad puede definir sus propios *tags* (etiquetas) para organizar sitios web y asignarles acciones como bloquear, alertar o notificar.\n"
+        "Además, requieren una pequeña descripción de lo que se tratará tu comunidad\n\n"
+        "👉 Puedes unirte a comunidades y suscribirte a sus tags desde la extensión del navegador.\n"
+        "🗳️ Las decisiones como agregar o editar tags/URLs requieren votación entre les integrantes del grupo.\n\n"
+        "⚙️ Usa */start* para ver las acciones disponibles."
+    )
+    bot.send_message(message.chat.id, explanation, parse_mode="Markdown")
+
+
+@bot.message_handler(commands=["tags"])
+def explain_tags(message):
+    """
+    Function that returns the explanation of what is a tag
+    """
+    explanation = (
+        "🏷️ *¿Qué son los tags?*\n\n"
+        "Las *etiquetas* (o tags) permiten clasificar las URLs compartidas por cada comunidad.\n"
+        "Por ejemplo, una comunidad de _Estudio_ que puede tener los tags _Idiomas_, _Matemáticas_, o _Ciencia_.\n\n"
+        "Cada etiqueta define una *acción predeterminada* que tu navegador ejecutará cuando detecte una URL asociada a ella:\n"
+        "- `block`: bloquear el sitio automáticamente 🚫\n"
+        "- `alert`: mostrar una alerta al visitar el sitio ⚠️\n"
+        "- `notify`: mostrar una notificación al visitar el sitio 🛎️\n\n"
+        "Cuando te suscribes a un tag, aplicas sus acciones automáticamente en tu navegador para las URLs relacionadas.\n\n"
+        "⚙️ Usa */start* para ver las acciones disponibles."
+    )
+    bot.send_message(message.chat.id, explanation, parse_mode="Markdown")
+
+
+@bot.message_handler(commands=["urls"])
+def explain_urls(message):
+    """
+    Function that returns the explanation of what is a url
+    """
+    explanation = (
+        "🔗 *¿Qué son las URLs registradas?*\n\n"
+        "Cada comunidad puede asociar *URLs* a sus etiquetas.\n"
+        "Estas URLs representan sitios que la comunidad considera relevantes o problemáticos, según el propósito de la etiqueta.\n\n"
+        "Cada URL se registra junto con una *justificación*, explicando por qué fue agregada.\n"
+        "Por ejemplo: una comunidad de _Ciberseguridad_ podría agregar _badsite.com_ bajo una etiqueta _Peligrosos_ con acción _block_, justificando que _Es un sitio web falso_.\n\n"
+        "Cuando te suscribes a un tag, todas las URLs asociadas a ella se aplicarán automáticamente según su acción definida.\n\n"
+        "⚙️ Usa */start* para ver las acciones disponibles."
+    )
+    bot.send_message(message.chat.id, explanation, parse_mode="Markdown")
 
 
 def show_action_menu(chat_id, db):
@@ -94,28 +153,38 @@ def show_action_menu(chat_id, db):
         bot.send_message(chat_id, "No existe una comunidad asociada a este chat, ingresa el nombre de la comunidad a registrar:")
     elif tag is None:
         markup.add(
-            InlineKeyboardButton("Crear tag", callback_data=f"action_create_tag"),
-            InlineKeyboardButton("No, Eliminar Comunidad", callback_data="confirm_delete_community")
+            InlineKeyboardButton("➕ Crear tag", callback_data=f"action_create_tag"),
+            InlineKeyboardButton("🗑️ Eliminar Comunidad", callback_data="confirm_delete_community")
             )
-        bot.send_message(chat_id, "No hay tags creados. ¿Deseas crear un tag?", reply_markup=markup)
+        bot.send_message(chat_id, "No hay tags creados. ¿Qué deseas hacer?", reply_markup=markup)
     elif url is None:
         markup.add(
-            InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
-            InlineKeyboardButton("Ver tags", callback_data="view_tags"),
-            InlineKeyboardButton("Eliminar Tag", callback_data="confirm_delete_tag"),
-            InlineKeyboardButton("Agregar URL", callback_data="action_add_url"),
-            InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
-        )        
+            InlineKeyboardButton("➕ Crear tag", callback_data="action_create_tag"),
+            InlineKeyboardButton("🏷️ Ver tags", callback_data="view_tags")
+        )
+        markup.add(
+            InlineKeyboardButton("🌐 Agregar URL", callback_data="action_add_url"),
+            InlineKeyboardButton("🗑️ Eliminar tag", callback_data="confirm_delete_tag")
+        )
+        markup.add(
+            InlineKeyboardButton("🗑️ Eliminar comunidad", callback_data="confirm_delete_community")
+        )
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
     else:
         markup.add(
-            InlineKeyboardButton("Crear tag", callback_data="action_create_tag"),
-            InlineKeyboardButton("Ver tags", callback_data="view_tags"),
-            InlineKeyboardButton("Eliminar Tag", callback_data="confirm_delete_tag"),
-            InlineKeyboardButton("Agregar URL", callback_data="action_add_url"),
-            InlineKeyboardButton("Ver/Editar URLs", callback_data="manage_urls"),
-            InlineKeyboardButton("Eliminar Comunidad", callback_data="confirm_delete_community")
+            InlineKeyboardButton("➕ Crear tag", callback_data="action_create_tag"),
+            InlineKeyboardButton("🏷️ Ver tags", callback_data="view_tags")
+        )
+        markup.add(
+            InlineKeyboardButton("🌐 Agregar URL", callback_data="action_add_url"),
+            InlineKeyboardButton("🔍 Ver/Editar URLs", callback_data="manage_urls")
+        )
+        markup.add(
+            InlineKeyboardButton("🗑️ Eliminar tag", callback_data="confirm_delete_tag"),
         )        
+        markup.add(
+            InlineKeyboardButton("🗑️ Eliminar comunidad", callback_data="confirm_delete_community")
+        )
         bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
 
 
@@ -176,10 +245,10 @@ def launch_anonymous_vote(chat_id, question, object_type, data):
 
     quorum = max(1, int((total_members - 1) * 0.5) +1)  # at least 50%
 
-    full_question = question + "\n ⚠️ No podrás cambiar tu selección luego de votar ⚠️"
+    full_question = question + "\n\n ⚠️ No podrás cambiar tu selección luego de votar ⚠️"
     message = bot.send_message(
         chat_id,
-        question,
+        full_question,
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("✅ Sí", callback_data=f"vote_yes|{chat_id}"),
             InlineKeyboardButton("❌ No", callback_data=f"vote_no|{chat_id}")
@@ -205,7 +274,7 @@ def handle_vote_buttons(call):
 
     # Prevent double voting
     if user_id in anonymous_votes[chat_id]['voters']:
-        bot.answer_callback_query(call.id, "Ya has votado.")
+        bot.answer_callback_query(call.id, "Ya has votado.", show_alert=True)
         return
 
     anonymous_votes[chat_id]['voters'].add(user_id)
@@ -224,19 +293,19 @@ def handle_vote_buttons(call):
 
 def check_anonymous_vote_result(chat_id):
     state = user_states.get(chat_id, {})
-
-
-
     result = anonymous_votes.get(chat_id, {})
+
+    # If there is no more data, the vote was processed earlier because 100% of the chat voted before the time expired
+    if not state or not result:
+        return
+
     total_votes = result['yes'] + result['no']
     quorum = state.get('quorum', 1)
 
-    if total_votes == 0:
-        percentage = 0
-    else:
-        percentage = result['yes'] / total_votes
+    # Requiere mayoría absoluta: más de la mitad de los votos del quórum
+    required_yes_votes = (quorum // 2) + 1
 
-    if  total_votes >= quorum and percentage >= 0.6:
+    if  total_votes >= quorum and result['yes'] >= required_yes_votes:
         type = state.get('object_type')
         data = state.get('data')
         if type == "tag":
@@ -258,6 +327,38 @@ def check_anonymous_vote_result(chat_id):
                 bot.send_message(chat_id, "✅ Edición aplicada correctamente.")
             else:
                 bot.send_message(chat_id, "❌ No se encontró la URL para editar.")
+        elif type == "delete_url":
+            url_id = data.get("url_id")
+            db = next(get_db())
+            url_entry = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
+            if url_entry:
+                db.delete(url_entry)
+                db.commit()
+                bot.send_message(chat_id, f"🗑️ URL {url_entry.url} eliminada con éxito.")
+            else:
+                bot.send_message(chat_id, "❌ No se encontró la URL para eliminar.")
+        elif type == "delete_tag":
+            tag_id = data.get("tag_id")
+            db = next(get_db())
+            tag = db.query(Tag).filter_by(id=tag_id, community_id=chat_id).first()
+            if tag:
+                db.delete(tag)
+                db.commit()
+                bot.send_message(chat_id, f"🗑️ Tag {tag.name} eliminado correctamente.")
+            else:
+                bot.send_message(chat_id, "❌ El tag ya no existe.")
+        elif type == "delete_community":
+            db = next(get_db())
+            db.query(Url).filter_by(community_id=chat_id).delete()
+            db.query(Tag).filter_by(community_id=chat_id).delete()
+            community = db.query(Community).filter_by(id=chat_id).first()
+            if community:
+                db.delete(community)
+                db.commit()
+                bot.send_message(chat_id, "🗑️ Comunidad eliminada exitosamente.")
+            else:
+                bot.send_message(chat_id, "❌ Comunidad ya no existe.")
+
     else:
         bot.send_message(chat_id, f"❌ La propuesta fue rechazada por la comunidad o no se cumplió quórum mínimo: {quorum}, votos recibidos: {total_votes}.")
 
@@ -270,7 +371,6 @@ def check_anonymous_vote_result(chat_id):
     user_states.pop(chat_id, None)
     db = next(get_db())
     show_action_menu(chat_id, db)
-
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -315,7 +415,7 @@ def handle_start(message):
         # Ask community name
         user_states[chat_id] = {'step': 'ask_name'}
         print(user_states)
-        bot.send_message(chat_id, "¡Hola! Primero, ingresa el nombre de la comunidad a registrar:", reply_markup=ForceReply(selective=True))
+        bot.send_message(chat_id, "¡Hola! Primero, ingresa el nombre de la comunidad a registrar:\n\nℹ️ Si quieres saber más sobre comunidades, envía /comunidades.", reply_markup=ForceReply(selective=True))
     else:
         # show action menu
         show_action_menu(chat_id, db)
@@ -379,10 +479,10 @@ def handle_action_menu(call):
 
     if action == "action_create_tag":
         user_states[chat_id] = {'step': 'fill_tag'}
-        bot.send_message(chat_id, "Ingresa el nombre del nuevo tag:", reply_markup=ForceReply(selective=True))
+        bot.send_message(chat_id, "Ingresa el nombre del nuevo tag:\n\nℹ️ Si quieres saber más sobre tags, envía /tags.", reply_markup=ForceReply(selective=True))
     else:
         user_states[chat_id] = {'step': 'fill_url'}
-        bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:")
+        bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:\n\nℹ️ Si quieres saber más sobre urls, envía /urls.", reply_markup=ForceReply(selective=True))
 
 
 # ----- FILL TAG -----
@@ -395,7 +495,7 @@ def handle_fill_tag_name(message):
     # name sanitization
     if not is_valid_name(tag_name, LENNAMES):
         bot.send_message(chat_id, f"⚠️ Nombre inválido, ingresa un nombre válido y de máximo {LENNAMES} carácteres.")
-        bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:", reply_markup=ForceReply(selective=True))
+        bot.send_message(chat_id, "Ingresa el nombre del nuevo Tag:\n\nℹ️ Si quieres saber más sobre tags, envía /tags.", reply_markup=ForceReply(selective=True))
         user_states[chat_id] = {'step': 'fill_tag'}
     else:
         # check if exits a tag with that name in this community, if so, ask again for the tag name
@@ -512,12 +612,12 @@ def handle_fill_url_address(message):
 
     # if do not have http or https add it
     if not url.startswith(('http://', 'https://')):
-        url = 'http://' + url
+        url = 'https://' + url
 
     # url sanitization
     if not is_valid_url(url):
         bot.send_message(chat_id, "🚫 La URL ingresada no es válida o es privada. Intenta con una dirección como `https://ejemplo.com`.")
-        bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:")
+        bot.send_message(chat_id, "Ingresa la dirección de la URL que deseas agregar:\n\nℹ️ Si quieres saber más sobre urls, envía /urls.")
         user_states[chat_id] = {'step': 'fill_url'}
         
     else:
@@ -530,9 +630,21 @@ def handle_tag_selection(call):
     chat_id = call.message.chat.id
     tag_name = call.data.split(":")[1]
     
-    # save tag in the state
+    # retrieve URL from status
     state = user_states.get(chat_id, {})
     url = state.get('url')
+    
+    db = next(get_db())
+    tag = db.query(Tag).filter_by(name=tag_name, community_id=chat_id).first()
+
+    # check if the same URL already exists for that tag and community
+    existing_url = db.query(Url).filter_by(url=url, tag_id=tag.id, community_id=chat_id).first()
+    if existing_url:
+        bot.answer_callback_query(call.id, "⚠️ Esta URL ya fue registrada en este tag.", show_alert=True)
+        bot.send_message(chat_id, "Por favor, intenta con una URL o Tag diferente.")
+        return show_action_menu(chat_id, db)
+
+    # save the new state
     user_states[chat_id] = {'step': 'fill_url_justification', 'url': url, 'tag': tag_name}
 
     # Delete the msg with the buttons to void confusion
@@ -721,30 +833,42 @@ def confirm_delete_url(call):
     db = next(get_db())
     url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
 
+    if not url:
+        bot.answer_callback_query(call.id, "❌ No se encontró la URL.")
+        return
+    
     # shows confirmation of deletion buttons
     markup = InlineKeyboardMarkup()
     markup.add(
-        InlineKeyboardButton("✅ Sí, eliminar", callback_data=f"confirm_delete_url_{url_id}"),
+        InlineKeyboardButton("✅ Sí, proponer eliminación", callback_data=f"propose_delete_url_{url_id}"),
         InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete")
     )
-    bot.edit_message_text(f"¿Estás segurx que deseas eliminar la URL {url.url}?", chat_id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text(
+        f"¿Estás segurx que deseas proponer la eliminación de la URL {url.url}?", 
+        chat_id, 
+        call.message.message_id, 
+        reply_markup=markup)
     bot.answer_callback_query(call.id)
 
 # delete url
-@bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_delete_url_"))
-def delete_url(call):
+@bot.callback_query_handler(func=lambda call: call.data.startswith("propose_delete_url_"))
+def propose_delete_url_vote(call):
     url_id = int(call.data.split("_")[-1])
     chat_id = call.message.chat.id
     db = next(get_db())
     url = db.query(Url).filter_by(id=url_id, community_id=chat_id).first()
-    if url:
-        db.delete(url)
-        db.commit()
-        bot.edit_message_text(f"🗑️ URL {url.url} eliminada con éxito.", chat_id, call.message.message_id)
-    else:
-        bot.send_message(chat_id, "No se encontró la URL.")
+    message_id = call.message.message_id
+
+    # delete propose delete button
+    bot.delete_message(chat_id, message_id)
+
+    if not url:
+        bot.send_message(chat_id, "❌ No se encontró la URL.")
+        return
+    
+    question = f"¿Apruebas eliminar la URL: {url.url}?"
+    launch_anonymous_vote(chat_id, question, "delete_url", {"url_id": url_id})
     bot.answer_callback_query(call.id)
-    show_action_menu(chat_id, db)
 
 
 # -- DROP TAG OR COMMUNITY --
@@ -768,18 +892,24 @@ def show_tags_to_delete(call):
 
 #delete tag
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_tag_"))
-def delete_tag(call):
+def propose_delete_tag_vote(call):
     tag_id = int(call.data.split("_")[-1])
     chat_id = call.message.chat.id
+    message_id = call.message.message_id
+
+    bot.delete_message(chat_id, message_id)
+
     db = next(get_db())
     tag = db.query(Tag).filter_by(id=tag_id, community_id=chat_id).first()
-    if tag:
-        db.delete(tag)
-        db.commit()
-        bot.edit_message_text(f"✅ Tag '{tag.name}' eliminado.", chat_id, call.message.message_id)
-        show_action_menu(chat_id, db)
-    else:
-        bot.answer_callback_query(call.id, "Tag no encontrado.", show_alert=True)
+    if not tag:
+        bot.send_message(chat_id, "❌ No se encontró el tag.")
+        return
+
+    question = f"¿Apruebas eliminar el tag: *{tag.name}*?"
+    launch_anonymous_vote(chat_id, question, "delete_tag", {"tag_id": tag_id})
+
+    bot.answer_callback_query(call.id)
+
 
 # ask confirmation delete community 
 @bot.callback_query_handler(func=lambda call: call.data == "confirm_delete_community")
@@ -791,25 +921,28 @@ def ask_confirm_community_delete(call):
         InlineKeyboardButton("⚠️ Sí, eliminar comunidad", callback_data="delete_community"),
         InlineKeyboardButton("❌ Cancelar", callback_data="cancel_delete")
     )
-    bot.edit_message_text("⚠️ ¿Estás segurx de que deseas eliminar toda la comunidad? Esto eliminará todos los tags y URLs asociados.", chat_id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("⚠️ ¿Estás segurx de que deseas proponer la eliminación de toda la comunidad? Esto eliminará todos los tags y URLs asociados.", chat_id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
 # delete community
 @bot.callback_query_handler(func=lambda call: call.data == "delete_community")
-def ask_confirm_delete_community(call):
+def propose_delete_community_vote(call):
     chat_id = call.message.chat.id
+    message_id = call.message.message_id
+
+    bot.delete_message(chat_id, message_id)
+
     db = next(get_db())
     community = db.query(Community).filter_by(id=chat_id).first()
-    if community:
-        # confirmas si es bnecesario borras las url y tags !!!!!!!!!!!!!!!!!!!!!!!!!!!
-        db.query(Url).filter_by(community_id=chat_id).delete()
-        db.query(Tag).filter_by(community_id=chat_id).delete()
-        db.delete(community)
-        db.commit()
-        bot.edit_message_text("Comunidad eliminada exitosamente.", chat_id, call.message.message_id)
-        show_action_menu(chat_id, db)
-    else:
-        bot.answer_callback_query(call.id, "No se encontró la comunidad.", show_alert=True)
+    if not community:
+        bot.send_message(chat_id, "❌ Comunidad no encontrada.")
+        return
+
+    question = f"¿Apruebas eliminar *toda la comunidad* y sus contenidos asociados?"
+    launch_anonymous_vote(chat_id, question, "delete_community", {"community_id": chat_id})
+
+    bot.answer_callback_query(call.id)
+
 
 
 # in case of cancel button
