@@ -47,6 +47,13 @@ async function loadTags(communityId) {
     const tags = await response.json();
 
     tagSelect.innerHTML = "";
+
+    // Add option "Todos"
+    const allOption = document.createElement("option");
+    allOption.value = "ALL_TAGS";
+    allOption.textContent = "Todos";
+    tagSelect.appendChild(allOption);
+
     for (const tag of tags) {
         const option = document.createElement("option");
         option.value = tag.id;
@@ -59,8 +66,14 @@ async function loadTags(communityId) {
 
     // Update description when changing tag selection
     tagSelect.addEventListener("change", () => {
-        updateTagDescription(tagSelect.value, tags);
+        if (tagSelect.value === "ALL_TAGS") {
+            tagDescription.textContent = "Suscribirse a todos los tags de esta comunidad.";
+        } else {
+            updateTagDescription(tagSelect.value, tags);
+        }
     });
+    // Saves tags in memory for use in loadBtn
+    tagSelect.dataset.allTags = JSON.stringify(tags); // Guardar como string
 }
 
 
@@ -84,25 +97,49 @@ document.getElementById("loadBtn").addEventListener("click", async () => {
         return;
     }
 
-    // Send message to background.js
-    chrome.runtime.sendMessage({
-        type: "fetchAndStoreURLs",
-        communityId: parseInt(communityId),
-        tagId: parseInt(tagId),
-        communityName,
-        tagName
-    }, (response) => {
-        if (response?.status === "success") {
-            statusMessage.style.color = "green";
-            statusMessage.textContent = `✅ URLs de "${tagName}" en "${communityName}" guardadas exitosamente.`;
-        } else {
+    if (tagId === "ALL_TAGS") {
+        const allTags = JSON.parse(tagSelect.dataset.allTags || "[]");
+
+        if (allTags.length === 0) {
             statusMessage.style.color = "red";
-            statusMessage.textContent = "❌ Error al guardar las URLs.";
+            statusMessage.textContent = "❌ No se encontraron tags para esta comunidad.";
+            return;
         }
-        setTimeout(() => {
-            statusMessage.textContent = "";
-        }, 5000);
-    });
+
+        for (const tag of allTags) {
+            chrome.runtime.sendMessage({
+                type: "fetchAndStoreURLs",
+                communityId: parseInt(communityId),
+                tagId: tag.id,
+                communityName,
+                tagName: tag.name
+            });
+        }
+
+        statusMessage.style.color = "green";
+        statusMessage.textContent = `✅ Todos los tags de "${communityName}" fueron suscritos.`;
+    } else {
+        // Send message to background.js
+        chrome.runtime.sendMessage({
+            type: "fetchAndStoreURLs",
+            communityId: parseInt(communityId),
+            tagId: parseInt(tagId),
+            communityName,
+            tagName
+        }, (response) => {
+            if (response?.status === "success") {
+                statusMessage.style.color = "green";
+                statusMessage.textContent = `✅ URLs de "${tagName}" en "${communityName}" guardadas exitosamente.`;
+            } else {
+                statusMessage.style.color = "red";
+                statusMessage.textContent = "❌ Error al guardar las URLs.";
+            }
+        });
+    }
+
+    setTimeout(() => {
+        statusMessage.textContent = "";
+    }, 5000);
 });
 
 
