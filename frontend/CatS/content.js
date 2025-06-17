@@ -38,11 +38,20 @@ chrome.runtime.sendMessage({ type: "getFilteredURLs" }, (response) => {
             });
           }
           if (action === "block") {
-            chrome.runtime.sendMessage({
-              type: "block",
-              url: entry.url,
-              justification: safeJustification + "\n\n" + contextSuffix
-            });
+            //chrome.runtime.sendMessage({
+              //type: "block",
+              //url: entry.url,
+              //justification: safeJustification + "\n\n" + contextSuffix
+              document.head.innerHTML = ''; // Vacía el head (quitar CSS original)
+              document.body.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:black;color:white;text-align:center;font-family:sans-serif;">
+                  <h1 style="font-size:3em;margin-bottom:0.5em;">🚫 Sitio Bloqueado</h1>
+                  <p style="max-width:80%;font-size:1.2em;">${safeJustification}</p>
+                  <p style="margin-top:2em;font-size:0.9em;opacity:0.6;">${contextSuffix}</p>
+                </div>
+              `;
+              document.title = "Sitio bloqueado por CatS";
+            //});
           }
         }
       }
