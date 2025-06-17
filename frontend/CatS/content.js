@@ -1,3 +1,9 @@
+function sanitize(input) {
+  const div = document.createElement('div');
+  div.innerText = input;
+  return div.innerHTML;
+}
+
 chrome.runtime.sendMessage({ type: "getFilteredURLs" }, (response) => {
   if (response?.urls) {
     const currentUrl = new URL(window.location.href);
@@ -17,23 +23,25 @@ chrome.runtime.sendMessage({ type: "getFilteredURLs" }, (response) => {
           console.log("Match encontrado:", entry.url);
 
           const action = entry.action;
-          const justification = entry.justification;
-          const contextSuffix = `Comunidad: ${entry.community_name} (ID: ${entry.community_id}, Tag: ${entry.tag_name}): `;
+          const safeJustification = sanitize(entry.justification);
+          const safeCommunityName = sanitize(entry.community_name);
+          const safeTagName = sanitize(entry.tag_name);
+          const contextSuffix = `Comunidad: ${safeCommunityName} (ID: ${entry.community_id}, Tag: ${safeTagName}): `;
 
           if (action === "alert") {
-              alert(justification + "\n\n" + contextSuffix);
+              alert(safeJustification + "\n\n" + contextSuffix);
           }
           if (action === "notify") {
             chrome.runtime.sendMessage({
               type: "notify",
-              message: justification + "\n\n" + contextSuffix
+              message: safeJustification + "\n\n" + contextSuffix
             });
           }
           if (action === "block") {
             chrome.runtime.sendMessage({
               type: "block",
               url: entry.url,
-              justification: justification + "\n\n" + contextSuffix
+              justification: safeJustification + "\n\n" + contextSuffix
             });
           }
         }

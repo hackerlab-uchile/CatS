@@ -17,9 +17,9 @@ def is_valid_url(url: str) -> bool:
         # check that the address has a TLD
         if not re.match(r".+\.[a-zA-Z]{2,}$", parsed.netloc):
             return False
-        # Do not accept IP local addresses
-        if re.match(r"^(localhost|127\.0\.0\.1|192\.168\.|10\.)", parsed.netloc):
-            return False
+        # In case than you dont want to accept IP local addresses, uncomment this:
+        #if re.match(r"^(localhost|127\.0\.0\.1|192\.168\.|10\.)", parsed.netloc):
+        #    return False
         return True
     except Exception:
         return False
@@ -37,7 +37,7 @@ def is_valid_name(name: str, max_length: int) -> bool:
     if not (1 <= len(name) <= max_length):
         return False
 
-    # Only letters, numbers, spaces, - and _
-    if not re.match(r"^[\w\s\-,]+$", name, re.UNICODE):
+    # do not allow: < > { } ^ ~ ` ,if you want to restrict more change to r"^[\w\s\-,]+$" this only allow numbers, letters,# do not allow: < > { } ^ ~ ` ,if you want to restrict more change to r"^[\w\s\-,]+$" this only allow numbers, letters, comma, hyphen and underscore
+    if not re.match(r"^[^<>{}^~`]+$", name, re.UNICODE):
         return False
     return True
