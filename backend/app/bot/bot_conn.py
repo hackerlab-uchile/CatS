@@ -47,26 +47,36 @@ def instrucciones_text():
 
         "⭐ Envía */start* y el bot te guiará en la creación de tu comunidad!\n\n"
 
-        "Descripción de las acciones existentes:\n\n"
-        
-        "📌 *Crear tag:* Te guiará en la creación de un tag.\n"
-        "🔍 *Ver tags:* Selecciona 'Ver tags' para revisar los que ya existen.\n"
-        "🌐 *Agregar URL:* Luego de tener al menos un tag, te guiará en la creación de una URL.\n"
-        "🔍 *Ver/Editar URLs:* Luego de tener al menos una URL, selecciona 'Ver/Editar URLs' para revisar o editar las URL existentes.\n"
-        "🧹 *Eliminar tag:* Permite eliminar un tag dentro de la lista de tags creados. ⚠️¡Esto eliminará todas las URLs asociadas exclusivamente a ese tag!⚠️\n"
-        "🧹 *Eliminar Comunidad:* Permite eliminar la comunidad asociada al chat. ⚠️¡Esto eliminará todos los tags y URLs creados en este chat!⚠️\n\n"
-
-        "❗❗Para que poder procesar bien tu respuesta, debes responder directamente al mensaje del bot❗❗\n"
+        "❗❗Para procesar tu respuesta, responde directamente al mensaje del bot❗❗\n"
         "👉 Para hacerlo:\n"
         "1. Mantén presionado (o haz clic derecho) en el mensaje del bot que te pidió algo.\n"
         '2. Elige la opción "Responder".\n'
-        "3. Escribe tu mensaje (nombre, descripción o justificación) y envíalo.\n\n"
+        "3. Escribe tu respuesta y envíalo.\n\n"
 
         "❌ Si deseas cancelar la creación de un tag o url en algún paso intermedio, solo envía /start para mostrar el menú de acciones disponibles\n\n"
 
         "⚙️ Usa */start* para ver las acciones disponibles.\n"
         "ℹ️ Ante dudas, envía */help* para volver a ver estas instrucciones."
     )
+
+@bot.message_handler(commands=["menu"])
+def explain_menu(message):
+    """
+    
+    """
+    explanation = (
+        "Descripción de las acciones existentes:\n\n"
+        
+        "📌 *Crear tag:* Te guiará en la creación de un tag. Para más información envía /tag.\n"
+        "🔍 *Ver tags:* Selecciona 'Ver tags' para revisar los que ya existen.\n"
+        "🌐 *Agregar URL:* Luego de tener al menos un tag, te guiará en la creación de una URL. Para más información envía /urls.\n"
+        "🔍 *Ver/Editar URLs:* Luego de tener al menos una URL, selecciona 'Ver/Editar URLs' para revisar o editar las URL existentes.\n"
+        "🧹 *Eliminar tag:* Permite eliminar un tag dentro de la lista de tags creados. ⚠️¡Esto eliminará todas las URLs asociadas exclusivamente a ese tag!⚠️\n"
+        "🧹 *Eliminar Comunidad:* Permite eliminar la comunidad asociada al chat. ⚠️¡Esto eliminará todos los tags y URLs creados en este chat!⚠️\n\n"
+
+        "ℹ️ Las acciones *Ver tags*, *Eliminar tag*, *Agregar URL* y *Ver/Editar URLs* estarán disponibles cuando crees al menos 1 tag."
+    )
+    bot.send_message(message.chat.id, explanation, parse_mode="Markdown")
 
 
 @bot.message_handler(commands=["comunidades"])
@@ -156,7 +166,7 @@ def show_action_menu(chat_id, db):
             InlineKeyboardButton("➕ Crear tag", callback_data=f"action_create_tag"),
             InlineKeyboardButton("🗑️ Eliminar Comunidad", callback_data="confirm_delete_community")
             )
-        bot.send_message(chat_id, "No hay tags creados. ¿Qué deseas hacer?", reply_markup=markup)
+        bot.send_message(chat_id, "No hay tags creados. ¿Qué deseas hacer?\nℹ️ Envía /menu para más información", reply_markup=markup)
     elif url is None:
         markup.add(
             InlineKeyboardButton("➕ Crear tag", callback_data="action_create_tag"),
@@ -169,7 +179,7 @@ def show_action_menu(chat_id, db):
         markup.add(
             InlineKeyboardButton("🗑️ Eliminar comunidad", callback_data="confirm_delete_community")
         )
-        bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
+        bot.send_message(chat_id, "¿Qué deseas hacer?\nℹ️ Envía /menu para más información", reply_markup=markup)
     else:
         markup.add(
             InlineKeyboardButton("➕ Crear tag", callback_data="action_create_tag"),
@@ -185,7 +195,7 @@ def show_action_menu(chat_id, db):
         markup.add(
             InlineKeyboardButton("🗑️ Eliminar comunidad", callback_data="confirm_delete_community")
         )
-        bot.send_message(chat_id, "¿Qué deseas hacer?", reply_markup=markup)
+        bot.send_message(chat_id, "¿Qué deseas hacer?\nℹ️ Envía /menu para más información", reply_markup=markup)
 
 
 def show_tag_buttons(chat_id, page=0):
@@ -524,9 +534,9 @@ def handle_fill_tag_description(message):
     else:
         markup = InlineKeyboardMarkup()
         markup.add(
-            InlineKeyboardButton("🔒 Block", callback_data="tag_action_block"),
-            InlineKeyboardButton("⚠️ Alert", callback_data="tag_action_alert"),
-            InlineKeyboardButton("🔔 Notify", callback_data="tag_action_notify")
+            InlineKeyboardButton("🔒 Bloquear", callback_data="tag_action_block"),
+            InlineKeyboardButton("⚠️ Alertar", callback_data="tag_action_alert"),
+            InlineKeyboardButton("🔔 Notificar", callback_data="tag_action_notify")
         )
         bot.send_message(chat_id, "Selecciona la acción del tag:", reply_markup=markup)
         user_states[chat_id] = {'step': 'tag_action_', 'tag_name':tag_name, 'tag_description': tag_description}
