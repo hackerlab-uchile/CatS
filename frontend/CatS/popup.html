@@ -6,14 +6,11 @@
 <head>
   <meta charset="UTF-8">
   <title>CatS Extension</title>
-  <style>
-    body { font-family: "Gill Sans Extrabold", sans-serif; padding: 30px; width: 280px; }
-    select, button { width: 100%; margin-top: 5px; }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
-  <h2>Seleccionar Comunidad y Tag</h2>
+  <h1>Seleccionar Comunidad y Tag</h1>
 
   <label for="communitySelect">Comunidad:</label>
   <select id="communitySelect"></select>
@@ -25,7 +22,7 @@
   
   <button id="loadBtn" style="background-color: #191D32; color: white;">Subscribirse</button>
 
-  <p id="statusMessage" style="margin-top: 10px; color: green;"></p>
+  <p id="statusMessage" style="margin-top: 10px; color: green; font-size: 13px;"></p>
 
   <script src="popup.js" defer></script>
 
@@ -35,7 +32,7 @@
   <button id="subscriptionsBtn" style="background-color: #282F44; color: white;">Mis suscripciones</button>
   <button id="resetBtn" style="background-color: #840032; color: white;">Resetear todo</button>
 
-  <div id="subscriptionsList" style="margin-top: 10px; font-size: 14px; white-space: pre-wrap;"></div>
+  <div id="subscriptionsList" style="margin-top: 10px; font-size: 17px; white-space: pre-wrap;"></div>
 
 </body>
 

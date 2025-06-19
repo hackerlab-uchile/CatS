@@ -38,8 +38,17 @@ function updateCommunityDescription(selectedId) {
 // Update tag descrption
 function updateTagDescription(selectedTagId, tags) {
     const selected = tags.find(t => t.id == selectedTagId);
-    tagDescription.textContent = selected ? selected.description : "";
+    if (selected) {
+        if (selected.action == 'alert') {action_name= 'Alertar'}
+        else if (selected.action == 'block') {action_name= 'Bloquear'}
+        else if (selected.action == 'notify') {action_name= 'Notificar'}
+        const actionText = ` (acción: ${action_name})`;
+        tagDescription.textContent = `${selected.description}${actionText}`;
+    } else {
+        tagDescription.textContent = "";
+    }
 }
+
 
 // Load tags and populate select
 async function loadTags(communityId) {
@@ -47,12 +56,6 @@ async function loadTags(communityId) {
     const tags = await response.json();
 
     tagSelect.innerHTML = "";
-
-    // Add option "Todos"
-    const allOption = document.createElement("option");
-    allOption.value = "ALL_TAGS";
-    allOption.textContent = "Todos";
-    tagSelect.appendChild(allOption);
 
     for (const tag of tags) {
         const option = document.createElement("option");
@@ -63,6 +66,18 @@ async function loadTags(communityId) {
     if (tags.length > 0) {
         updateTagDescription(tagSelect.value, tags);
     }
+
+    // add an disabled option for visual difference between tag options and "Todos sus tag" option
+    const separatorOption = document.createElement("option");
+    separatorOption.disabled = true;
+    separatorOption.textContent = "────────────";
+    tagSelect.appendChild(separatorOption);
+
+    // Add option "Todos"
+    const allOption = document.createElement("option");
+    allOption.value = "ALL_TAGS";
+    allOption.textContent = "🌐 Todos sus Tags";
+    tagSelect.appendChild(allOption);
 
     // Update description when changing tag selection
     tagSelect.addEventListener("change", () => {
@@ -202,6 +217,43 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                 label.textContent = `• ${data.community_name} → ${data.tag_name}`;
                 label.style.marginRight = "6px";
 
+                // View URLs button
+                const viewBtn = document.createElement("button");
+                viewBtn.textContent = "Ver URLs";
+                viewBtn.style.fontSize = "11px";
+                viewBtn.style.padding = "2px 6px";
+                viewBtn.style.marginRight = "4px";
+                viewBtn.style.backgroundColor = "#3C3B6E";
+                viewBtn.style.color = "white";
+                viewBtn.addEventListener("click", () => {
+                    chrome.runtime.sendMessage({
+                        type: "getSubscriptions"
+                    }, (response) => {
+                        if (!response || !response.urls) return;
+                        const filtered = response.urls.filter(
+                            u => u.community_id == data.community_id && u.tag_id == data.tag_id
+                        );
+
+                        // Temporarily save data in chrome.storage.local
+                        chrome.storage.local.set({
+                            urlsToShow: {
+                                community: data.community_name,
+                                tag: data.tag_name,
+                                urls: filtered.map(u => u.url)
+                            }
+                        }, () => {
+                            // Open new popup window
+                            chrome.windows.create({
+                                url: chrome.runtime.getURL("urls_popup.html"),
+                                type: "popup",
+                                width: 500,
+                                height: 300
+                            });
+                        });
+                    });
+                });
+
+                // Unsubscribe button
                 const btn = document.createElement("button");
                 btn.textContent = "Desubscribir";
                 btn.style.fontSize = "11px";
@@ -209,6 +261,9 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                 btn.style.backgroundColor = "#6D3B47"
                 btn.style.color = "white"
                 btn.addEventListener("click", () => {
+                    const confirmed = confirm(`¿Estás segurx de que deseas desuscribirte de "${data.tag_name}" en "${data.community_name}"?`);
+                    if (!confirmed) return;
+
                     chrome.runtime.sendMessage({
                         type: "unsubscribe",
                         community_id: data.community_id,
@@ -217,6 +272,7 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                         if (res.status === "success") {
                             label.textContent = "🧹 Desuscrito";
                             btn.remove();
+                            viewBtn.remove();
                         } else {
                             alert("Error al desubscribir.");
                         }
@@ -224,8 +280,31 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
                 });
 
                 container.appendChild(label);
-                container.appendChild(btn);
+
+                // Crear un contenedor para los botones
+                const btnGroup = document.createElement("div");
+                btnGroup.style.display = "flex";
+                btnGroup.style.gap = "8px"; // Espacio entre botones
+                btnGroup.style.marginTop = "4px";
+
+                // Botón Ver URLs (asegúrate de haberlo creado antes)
+                viewBtn.style.flex = "1";
+                viewBtn.style.fontSize = "11px";
+                viewBtn.style.padding = "2px 6px";
+                viewBtn.style.backgroundColor = "#4A6FA5";
+                viewBtn.style.color = "white";
+
+                // Botón Desubscribir (ya creado como `btn`)
+                btn.style.flex = "1";
+
+                // Añadir ambos botones al contenedor
+                btnGroup.appendChild(viewBtn);
+                btnGroup.appendChild(btn);
+
+                // Añadir al contenedor principal
+                container.appendChild(btnGroup);
                 subscriptionsList.appendChild(container);
+
             }
         }
 
