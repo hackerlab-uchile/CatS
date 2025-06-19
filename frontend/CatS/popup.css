@@ -1,0 +1,65 @@
+
+body {
+    font-family: "Segoe UI", sans-serif;
+    font-size: 16px;
+    padding: 16px;
+    width: 360px;
+    margin: 0;
+    background-color: #f9f9f9;
+}
+
+h1 {
+    font-size: 20px;
+    margin: 0 0 10px 0;
+    color: #191D32;
+}
+
+label {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+select, button {
+    width: 100%;
+    margin-top: 4px;
+    padding: 6px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+button {
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#loadBtn {
+    background-color: #191D32;
+    color: white;
+}
+
+#subscriptionsBtn {
+    background-color: #282F44;
+    color: white;
+    
+}
+
+#resetBtn {
+    background-color: #840032;
+    color: white;
+}
+
+hr {
+    margin: 5px 0 3px;
+}
+
+.description {
+    font-size: 14px;
+    color: #555;
+    margin: 4px 0 10px 4px;
+}
+
+#statusMessage {
+    font-weight: bold;
+    min-height: 18px;
+}
