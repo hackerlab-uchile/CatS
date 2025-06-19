@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Sitio Bloqueado</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 35px;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 25px;
+      max-width: 80%;
+      margin: 8px 0;
+    }
+    .context {
+      font-size: 20px;
+      opacity: 0.6;
+      margin-top: 32px;
+    }
+  </style>
+  <script src="block.js"></script>
+</head>
+<body>
+  <h1>🚫 Sitio Bloqueado</h1>
+  <p id="justification">Este sitio ha sido bloqueado.</p>
+  <p id="context" class="context"></p>
+</body>
+</html>

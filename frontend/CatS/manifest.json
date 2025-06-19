@@ -47,7 +47,7 @@
 
     "web_accessible_resources": [
         {
-        "resources": ["/icons/Opcion_logo_2.png", "urls__popup.html", "urls_popup.js"],
+        "resources": ["/icons/Opcion_logo_2.png", "block.html", "block.js", "urls__popup.html", "urls_popup.js"],
         "matches": ["<all_urls>"]
         }
     ],
