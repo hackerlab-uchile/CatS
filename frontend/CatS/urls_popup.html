@@ -22,12 +22,34 @@
       max-height: 400px;
       white-space: pre-wrap;
     }
+    #closeBtn {
+      display: block;
+      margin: 20px auto 0 auto;
+      width: 90%;
+      padding: 10px;
+      font-size: 14px;
+      background-color: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #closeBtn:hover {
+      background-color: #c9302c;
+    }
   </style>
 </head>
 <body>
   <h2 id="title">URLs</h2>
   <pre id="urlList">Cargando...</pre>
 
+  <button id="closeBtn">Cerrar</button>
+
+  <script>
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      window.close();
+    });
+  </script>
   <script src="urls_popup.js"></script>
 </body>
 </html>

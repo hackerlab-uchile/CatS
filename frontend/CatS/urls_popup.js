@@ -25,4 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
       container.textContent = urls.join("\n");
     }
   });
+
+  // listener for the button "Cerrar"
+  const closeBtn = document.getElementById("closeBtn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      window.close();
+    });
+  }
 });
