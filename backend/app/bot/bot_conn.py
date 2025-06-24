@@ -39,7 +39,7 @@ def instrucciones_text():
     Function that returns the intructions for use of the bot
     """
     return (
-        "👋 *Bienvenidx a CatS bot!*\n"
+        "👋 *Bienvenide a CatS bot!*\n"
         "Con este bot podrás crear y gestionar tu comunidad 😺 \n"
         "------------------------------------------------------\n\n"
 
@@ -67,14 +67,15 @@ def explain_menu(message):
     explanation = (
         "Descripción de las acciones existentes:\n\n"
         
-        "📌 *Crear tag:* Te guiará en la creación de un tag. Para más información envía /tag.\n"
+        "📌 *Crear tag:* Te guiará en la creación de un tag. Para más información envía /tags.\n"
         "🔍 *Ver tags:* Selecciona 'Ver tags' para revisar los que ya existen.\n"
         "🌐 *Agregar URL:* Luego de tener al menos un tag, te guiará en la creación de una URL. Para más información envía /urls.\n"
         "🔍 *Ver/Editar URLs:* Luego de tener al menos una URL, selecciona 'Ver/Editar URLs' para revisar o editar las URL existentes.\n"
         "🧹 *Eliminar tag:* Permite eliminar un tag dentro de la lista de tags creados. ⚠️¡Esto eliminará todas las URLs asociadas exclusivamente a ese tag!⚠️\n"
         "🧹 *Eliminar Comunidad:* Permite eliminar la comunidad asociada al chat. ⚠️¡Esto eliminará todos los tags y URLs creados en este chat!⚠️\n\n"
 
-        "ℹ️ Las acciones *Ver tags*, *Eliminar tag*, *Agregar URL* y *Ver/Editar URLs* estarán disponibles cuando crees al menos 1 tag."
+        "ℹ️ Las acciones *Ver tags*, *Eliminar tag*, *Agregar URL* y *Ver/Editar URLs* estarán disponibles cuando crees al menos 1 tag.\n"
+        "⚙️ Usa */start* para ver las acciones disponibles."
     )
     bot.send_message(message.chat.id, explanation, parse_mode="Markdown")
 
@@ -264,6 +265,15 @@ def launch_anonymous_vote(chat_id, question, object_type, data):
             InlineKeyboardButton("❌ No", callback_data=f"vote_no|{chat_id}")
         ]])
     )
+
+    # Initialize votes
+    anonymous_votes[chat_id] = {
+        'yes': 0,
+        'no': 0,
+        'voters': set()
+    }
+
+    # User status
     user_states[chat_id] = {
         'step': 'wait_approval',
         'object_type': object_type,
@@ -282,9 +292,14 @@ def handle_vote_buttons(call):
     chat_id = int(chat_id)
     user_id = call.from_user.id
 
+    # Early verification
+    if chat_id not in anonymous_votes:
+        bot.answer_callback_query(call.id, "⚠️ La votación ya expiró o no fue inicializada correctamente.")
+        return
+
     # Prevent double voting
     if user_id in anonymous_votes[chat_id]['voters']:
-        bot.answer_callback_query(call.id, "Ya has votado.", show_alert=True)
+        bot.answer_callback_query(call.id, "Ya has votado.")
         return
 
     anonymous_votes[chat_id]['voters'].add(user_id)
@@ -395,7 +410,7 @@ def welcome_new_members(message):
             bot.send_message(
                 message.chat.id,
                 "👋 ¡Hola! Soy CatS bot.\n"
-                "Escribe /help para ver qué puedo hacer.",
+                "Escribe o presiona /help para ver qué puedo hacer.",
                 parse_mode="Markdown"
             )
 
@@ -650,7 +665,7 @@ def handle_tag_selection(call):
     # check if the same URL already exists for that tag and community
     existing_url = db.query(Url).filter_by(url=url, tag_id=tag.id, community_id=chat_id).first()
     if existing_url:
-        bot.answer_callback_query(call.id, "⚠️ Esta URL ya fue registrada en este tag.", show_alert=True)
+        bot.answer_callback_query(call.id, "⚠️ Esta URL ya fue registrada en este tag.")
         bot.send_message(chat_id, "Por favor, intenta con una URL o Tag diferente.")
         return show_action_menu(chat_id, db)
 
