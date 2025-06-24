@@ -1,6 +1,6 @@
 const API_BASE = "http://localhost:8000";
 const DB_NAME = "CatS_local_DB";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "urls_storage";
 
 // Clean up dynamic rules on install or update
@@ -25,8 +25,7 @@ function openDatabase() {
 
         if (!db.objectStoreNames.contains(STORE_NAME)) {
         // Create the objectStore with the key 'url' and add index for 'tag_id', 'community_id', 'action' and 'justification'
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "url_tag" });
-        objectStore.createIndex("url", "url", { unique: false });
+        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "url" }); // url_tag useful to show multiple actions for the same url
         objectStore.createIndex("tag_id", "tag_id", { unique: false });
         objectStore.createIndex("community_id", "community_id", { unique: false });
         objectStore.createIndex("action", "action", { unique: false });
@@ -47,9 +46,9 @@ async function addURL(url, tag_id, community_id, action, justification, communit
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const url_tag = `${url}|${tag_id}`;
+        //const url_tag = `${url}|${tag_id}`; //useful for show multiple actions for the same url
         const request = store.put({
-            url_tag,
+            //url_tag,
             url,
             tag_id,
             community_id,
@@ -118,63 +117,6 @@ function generateRuleIdFromUrl(url) {
 }
 
 
-// Allow content.js to query the database
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "getFilteredURLs") {
-        getAllURLs()
-            .then(data => sendResponse({ urls: data }))
-            .catch(error => sendResponse({ error }));
-        return true; // indicate async response
-    }
-    if (message.type === "notify") {
-        chrome.notifications.create({
-            type: "basic",
-            iconUrl: "icons/border-48.png", // CHANGE --------------------------------------!!!!!
-            title: "CatS",
-            message: message.message
-        });
-    }
-    if (message.type === "block") {
-        const urlToBlock = message.url;
-        const justification = message.justification;
-    
-        chrome.notifications.create({
-            type: "basic",
-            iconUrl: "icons/border-48.png",
-            title: "Sitio Bloqueado",
-            message: `${justification}`
-        });
-
-        // delay before locking
-        setTimeout(() => {
-            chrome.declarativeNetRequest.updateDynamicRules({
-                addRules: [{
-                    id: generateRuleIdFromUrl(urlToBlock),
-                    priority: 1,
-                    action: { type: "block" },
-                    condition: {
-                        urlFilter: urlToBlock,
-                        resourceTypes: ["main_frame"]
-                    }
-                }],
-            });
-        }, 200); // 200ms, ajustable
-    
-        return true;
-    }    
-    if (message.type === "fetchAndStoreURLs") {
-        const { communityId, tagId, communityName, tagName } = message;
-        fetchAndStoreURLs(communityId, tagId, communityName, tagName)
-            .then(() => sendResponse({ status: "success" }))
-            .catch((error) => {
-                console.error("Error en fetchAndStoreURLs desde popup:", error);
-                sendResponse({ status: "error", error: error.message });
-            });
-        return true;
-    }
-
-});
-
 // Clear indexedDB 
 async function clearIndexedDB() {
     const db = await openDatabase();
@@ -203,8 +145,49 @@ async function removeAllDynamicRules() {
 }
 
 
-// Listen to new commands from popup
+// Listen to new commands from popup and Allow content.js to query the database
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "getFilteredURLs") {
+        getAllURLs()
+            .then(data => sendResponse({ urls: data }))
+            .catch(error => sendResponse({ error }));
+        return true; // indicate async response
+    }
+    if (message.type === "notify") {
+        chrome.notifications.create({
+            type: "basic",
+            iconUrl: "icons/Opcion_logo_2.png", // CHANGE --------------------------------------!!!!!
+            title: "CatS",
+            message: message.message
+        });
+    }
+    if (message.type === "block") {
+        const urlToBlock = message.url;
+
+        chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [{
+                id: generateRuleIdFromUrl(urlToBlock),
+                priority: 1,
+                action: { type: "block" },
+                condition: {
+                    urlFilter: urlToBlock,
+                    resourceTypes: ["main_frame"]
+                }
+            }],
+        });
+        return true;
+    }    
+    if (message.type === "fetchAndStoreURLs") {
+        const { communityId, tagId, communityName, tagName } = message;
+        fetchAndStoreURLs(communityId, tagId, communityName, tagName)
+            .then(() => sendResponse({ status: "success" }))
+            .catch((error) => {
+                console.error("Error en fetchAndStoreURLs desde popup:", error);
+                sendResponse({ status: "error", error: error.message });
+            });
+        return true;
+    }
+
     if (message.type === "resetEverything") {
         Promise.all([clearIndexedDB(), removeAllDynamicRules()])
             .then(() => sendResponse({ status: "success" }))
@@ -239,7 +222,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const ruleIdsToRemove = toDelete.map(item => generateRuleIdFromUrl(item.url));
 
                 for (const item of toDelete) {
-                    store.delete(item.url_tag);
+                    store.delete(item.url);
                 }
 
                 chrome.declarativeNetRequest.updateDynamicRules({
