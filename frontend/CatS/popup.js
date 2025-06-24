@@ -312,6 +312,86 @@ document.getElementById("subscriptionsBtn").addEventListener("click", () => {
     });
 });
 
+document.getElementById("refreshSubscriptionsBtn").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "getSubscriptions" }, async (response) => {
+    if (!response || !response.urls || response.urls.length === 0) {
+      statusMessage.style.color = "red";
+      statusMessage.textContent = "❌ No tienes subscripciones para actualizar.";
+      setTimeout(() => {
+      statusMessage.textContent = "";
+      }, 5000);
+      return;
+    }
+
+    const current = response.urls;
+
+    // Agrupar por comunidad-tag
+    const uniqueSubs = new Map();
+    for (const entry of current) {
+      const key = `${entry.community_id}-${entry.tag_id}`;
+      if (!uniqueSubs.has(key)) {
+        uniqueSubs.set(key, {
+          community_id: entry.community_id,
+          community_name: entry.community_name,
+          tag_id: entry.tag_id,
+          tag_name: entry.tag_name
+        });
+      }
+    }
+
+    // Verifica si cada comunidad y tag aún existen
+    const responseCom = await fetch(`${API_BASE}/communities/`);
+    const communities = await responseCom.json();
+
+    for (const [_, sub] of uniqueSubs.entries()) {
+      const foundCommunity = communities.find(c => c.id === sub.community_id);
+      if (!foundCommunity) {
+        const confirmed = confirm(`⚠️ La comunidad "${sub.community_name}" ya no existe. ¿Quieres eliminar esta subscripción?`);
+        if (confirmed) {
+          chrome.runtime.sendMessage({
+            type: "unsubscribe",
+            community_id: sub.community_id,
+            tag_id: sub.tag_id
+          });
+        }
+        continue;
+      }
+
+      // Si aún existe, reintenta guardar
+      const tagResponse = await fetch(`${API_BASE}/communities/${sub.community_id}/tags`);
+      const tags = await tagResponse.json();
+      const tag = tags.find(t => t.id === sub.tag_id);
+
+      if (!tag) {
+        const confirmed = confirm(`⚠️ El tag "${sub.tag_name}" ya no existe en la comunidad "${sub.community_name}". ¿Eliminar subscripción?`);
+        if (confirmed) {
+          chrome.runtime.sendMessage({
+            type: "unsubscribe",
+            community_id: sub.community_id,
+            tag_id: sub.tag_id
+          });
+        }
+        continue;
+      }
+
+      chrome.runtime.sendMessage({
+        type: "fetchAndStoreURLs",
+        communityId: sub.community_id,
+        tagId: sub.tag_id,
+        communityName: sub.community_name,
+        tagName: sub.tag_name
+      });
+    }
+
+    statusMessage.style.color = "green";
+    statusMessage.textContent = "🔄 Actualización de subscripciones completada.";
+    setTimeout(() => {
+    statusMessage.textContent = "";
+    }, 5000);
+  });
+});
+
+
 
 // Initialize on popup opening
 loadCommunities();

@@ -15,6 +15,32 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+chrome.runtime.onStartup.addListener(() => {
+  console.log("🚀 Chrome iniciado: actualizando subscripciones automáticamente...");
+
+  getAllURLs().then((entries) => {
+    const uniqueSubs = new Map();
+    for (const entry of entries) {
+      const key = `${entry.community_id}-${entry.tag_id}`;
+      if (!uniqueSubs.has(key)) {
+        uniqueSubs.set(key, {
+          community_id: entry.community_id,
+          community_name: entry.community_name,
+          tag_id: entry.tag_id,
+          tag_name: entry.tag_name
+        });
+      }
+    }
+
+    uniqueSubs.forEach(sub => {
+      fetchAndStoreURLs(sub.community_id, sub.tag_id, sub.community_name, sub.tag_name);
+    });
+  }).catch(err => {
+    console.error("❌ Error actualizando subscripciones al iniciar:", err);
+  });
+});
+
+
 // Open (or create) database 
 function openDatabase() {
     return new Promise((resolve, reject) => {
