@@ -6,7 +6,7 @@
     "description": "This is the second version of the CatS extension",
   
     "icons": {
-        "48": "icons/Opcion_logo_2.png"
+        "48": "icons/CatS.png"
     },
 
     "permissions": [
@@ -47,7 +47,7 @@
 
     "web_accessible_resources": [
         {
-        "resources": ["/icons/Opcion_logo_2.png", "block.html", "block.js", "urls__popup.html", "urls_popup.js"],
+        "resources": ["/icons/CatS.png", "block.html", "block.js", "urls__popup.html", "urls_popup.js"],
         "matches": ["<all_urls>"]
         }
     ],
@@ -55,7 +55,7 @@
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
-            "48": "icons/Opcion_logo_2.png"
+            "48": "icons/CatS.png"
         }
     }
 

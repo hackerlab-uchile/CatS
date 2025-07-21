@@ -14,6 +14,9 @@ async function loadCommunities() {
     const response = await fetch(`${API_BASE}/communities/`);
     communities = await response.json();
 
+    // Sort by name alphabetically (case-insensitive)
+    communities.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
     communitySelect.innerHTML = "";
     for (const community of communities) {
         const option = document.createElement("option");
@@ -32,7 +35,9 @@ async function loadCommunities() {
 // Update community description
 function updateCommunityDescription(selectedId) {
     const selected = communities.find(c => c.id == selectedId);
-    communityDescription.textContent = selected ? selected.description : "";
+    communityDescription.textContent = selected
+        ? `${selected.description} (ID: ${selected.id})`
+        : "";
 }
 
 // Update tag descrption
@@ -54,6 +59,9 @@ function updateTagDescription(selectedTagId, tags) {
 async function loadTags(communityId) {
     const response = await fetch(`${API_BASE}/communities/${communityId}/tags`);
     const tags = await response.json();
+
+    // Sort by name alphabetically (case-insensitive)
+    tags.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 
     tagSelect.innerHTML = "";
 

@@ -182,7 +182,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "notify") {
         chrome.notifications.create({
             type: "basic",
-            iconUrl: "icons/Opcion_logo_2.png", // CHANGE --------------------------------------!!!!!
+            iconUrl: "icons/CatS.png", // CHANGE --------------------------------------!!!!!
             title: "CatS",
             message: message.message
         });
