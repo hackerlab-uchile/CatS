@@ -5,10 +5,8 @@ services:
     restart: 'no'
     ports:
       - "5433:5432"
-    environment:
-      POSTGRES_USER: CatS_user
-      POSTGRES_PASSWORD: CatS_test
-      POSTGRES_DB: CatS
+    env_file:
+      - .env
     volumes:
       - db-data:/var/lib/postgresql/data
   backend:
