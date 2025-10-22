@@ -283,7 +283,14 @@ def launch_anonymous_vote(chat_id, question, object_type, data):
     }
     # Start vote check timer
     threading.Timer(SURVEY_WAITIG_TIME, check_anonymous_vote_result, args=[chat_id]).start()
-    bot.send_message(chat_id, f"Se esperará {SURVEY_WAITIG_TIME} segundos para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
+    m, s = divmod(SURVEY_WAITIG_TIME, 60)
+    if m and s:
+        readable = f"{m} min {s} s"
+    elif m:
+        readable = f"{m} min"
+    else:
+        readable = f"{s} s"
+    bot.send_message(chat_id, f"Se esperará {readable} para recolectar la mayor cantidad de votos posibles, por favor espere antes de continuar.")
 
 # Handle votes
 @bot.callback_query_handler(func=lambda call: call.data.startswith("vote_"))
